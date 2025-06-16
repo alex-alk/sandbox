@@ -43,6 +43,11 @@ const emit = defineEmits([
 const onSubmit = function(e) {
     e.preventDefault()
 
+    if (review.name === '' || review.content === '' || review.rating === null) {
+      alert('aaaaaaaaaa')
+      return
+    }
+
     const productReview = {
         name: review.name,
         content: review.content,

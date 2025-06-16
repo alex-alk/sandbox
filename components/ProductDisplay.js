@@ -1,4 +1,4 @@
-import { defineEmits, getState, computed, ref, updateText, updateTexts, updateBinds, createEls, addEvent } from "../main.js";
+import { defineEmits, getState, computed, ref, updateText, updateTexts, updateBinds, createEls, addEvent, updateIf } from "../main.js";
     import ReviewForm from './ReviewForm.js'
     import ReviewList from './ReviewList.js'
 
@@ -15,9 +15,9 @@ const templ = `
             <p v-text="stock"></p>
             <p v-text="shipping"></p>
             <ul>
-                <li class="a" li-details></li>
+                <li class="a" v-for="details"></li>
             </ul>
-            <div style-variants="background-color" class="color-circle" div-variants v-on:mouseover="updateVariant"></div>
+            <div style-variants="background-color" class="color-circle" v-for="variants" v-on:mouseover="updateVariant"></div>
 
             <button 
             v-bind:disabled="notInStock" 
@@ -26,7 +26,7 @@ const templ = `
             v-on:click="addToCart">Add to cart</button>
         </div>
     </div>
-    <div v-component="reviewList"></div>
+    <div v-if="reviews.length > 0" v-component="reviewList"></div>
     <div v-component="reviewForm" v-on:review-submitted="addReview"></div>
 </div>`
 
@@ -38,10 +38,7 @@ const reviews = ref([
 
 ])
 
-const addReview = (review) => {
-    console.log('addReview is called')
-    reviews.value.push(review)
-}
+updateIf({reviews}, productDisplay)
 
 
 const templates = productDisplay.querySelectorAll('[v-component=reviewForm]');
@@ -51,7 +48,15 @@ for (const template of templates) {
 const templatesf = productDisplay.querySelectorAll('[v-component=reviewList]');
 for (const template of templatesf) {
     template.append(ReviewList(reviews));
+    
 }
+
+const addReview = (review) => {
+    console.log('addReview is called')
+    reviews.value.push(review)
+    console.log(review)
+}
+
 
 const details = ['50% cotton', '30% wool', '20% polyester']
 const variants = [
@@ -140,8 +145,8 @@ updateBinds('class', data, productDisplay)
 updateBinds('disabled', data, productDisplay)
 
 
-createEls('li', {details}, productDisplay);
-createEls('div', {variants}, productDisplay)
+createEls({details}, productDisplay);
+createEls({variants}, productDisplay)
 updateStyleFromArray({variants}, 'color', productDisplay)
 addEvent('click', methods, productDisplay)
 addEvent('mouseover', methods, productDisplay)
