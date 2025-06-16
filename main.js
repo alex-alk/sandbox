@@ -1,3 +1,45 @@
+// Step 2: Computed system
+const computedDeps = [];
+
+export function computed(fn) {
+  const listeners = [];
+  const result = { value: fn() };
+
+  const update = () => {
+    const newVal = fn();
+    result.value = newVal;
+    listeners.forEach(l => l(newVal));
+  };
+
+  result._subscribe = (fn) => listeners.push(fn);
+
+  computedDeps.push(update);
+
+  return result;
+}
+
+export function getState(data) {
+
+  return new Proxy(data, {
+  set(target, key, value) {
+    target[key] = value;
+    // Notify all watchers
+    computedDeps.forEach(fn => fn());
+    return true;
+  }
+});
+}
+
+// export const state = new Proxy(data, {
+//   set(target, key, value) {
+//     target[key] = value;
+//     // Notify all watchers
+//     computedDeps.forEach(fn => fn());
+//     return true;
+//   }
+// });
+
+
 
 export function ref(initialValue) {
   const listeners = [];
@@ -20,10 +62,12 @@ export function ref(initialValue) {
   return obj;
 }
 
-export function addEvent(type, data) {
+export function addEvent(type, data, template) {
+
+  let component = template ?? document;
 
       //const parameterName = Object.keys(obj)[0];
-      const li = document.querySelectorAll(`[v-on\\:${type}]`);
+      const li = component.querySelectorAll(`[v-on\\:${type}]`);
 
       for (const el of li) {
 
@@ -42,10 +86,12 @@ function isReactive(val) {
   return typeof val === 'object' && val !== null && 'value' in val && typeof val._subscribe === 'function';
 }
 
-    export function updateBinds(type, data) {
+    export function updateBinds(type, data, template) {
+
+      let component = template ?? document;
 
       //const parameterName = Object.keys(obj)[0];
-      const li = document.querySelectorAll(`[v-bind\\:${type}]`);
+      const li = component.querySelectorAll(`[v-bind\\:${type}]`);
 
       for (const el of li) {
 
@@ -73,8 +119,6 @@ function isReactive(val) {
 
           if (isReactive(variableSelected)) {
             
-             console.log(variableValue, variableName, dataValue, attrValue, variableSelected)
-
               if (variableSelected.value) {
                 el.classList.add(variableName)
               }
@@ -122,11 +166,15 @@ function isReactive(val) {
 //     }
 
 
-export    function createEls(type, obj, key) {
+export    function createEls(type, obj, template) {
+
+  let component = template ?? document;
+
+
       const parameterName = Object.keys(obj)[0];  // "product"
       const detailsArray = obj[parameterName];            // "product"
       
-      const li = document.querySelector(`[${type}-${parameterName}]`);
+      const li = component.querySelector(`[${type}-${parameterName}]`);
 
       // Get parent element (likely <ul> or <ol>)
       const parent = li.parentElement;
@@ -145,13 +193,13 @@ export    function createEls(type, obj, key) {
           newLi.setAttribute(attr.name, attr.value);
         });
 
-        if (key) {
-          newLi.textContent = detail[key];
-        } else {
+        //if (key) {
+          //newLi.textContent = detail[key];
+        //} else {
           if (typeof detail === 'string') {
             newLi.textContent = detail
           }
-        }
+        //}
         newLi.setAttribute('elid', index)
         // if (detail['id']) {
         //   newLi.setAttribute('elid', detail['id'])
@@ -160,11 +208,13 @@ export    function createEls(type, obj, key) {
       });
     }
 
-export    function createLis(obj) {
+export    function createLis(obj, template) {
+  let component = template ?? document;
+
       const parameterName = Object.keys(obj)[0];  // "product"
       const detailsArray = obj[parameterName];            // "product"
       
-      const li = document.querySelector(`[lis-${parameterName}]`);
+      const li = component.querySelector(`[lis-${parameterName}]`);
 
       // Get parent element (likely <ul> or <ol>)
       const parent = li.parentElement;
@@ -188,12 +238,14 @@ export    function createLis(obj) {
       });
     }
 
-export    function updateTexts(data) {
+export    function updateTexts(data, template = null) {
 
       // const parameterName = Object.keys(obj)[0];  // "product"
       // const text = obj[parameterName];            // "product"
+
+      let component = template ?? document;
       
-      const els = document.querySelectorAll(`[v-text]`);
+      const els = component.querySelectorAll(`[v-text]`);
 
       for (const el of els) {
         const attrValue = el.getAttribute('v-text');
@@ -210,21 +262,25 @@ export    function updateTexts(data) {
       }
     }
 
-    export    function updateText(data) {
+    export    function updateText(data, template) {
+
+      let component = template ?? document;
 
       const parameterName = Object.keys(obj)[0];  // "product"
       const text = obj[parameterName];            // "product"
       
-      const el = document.querySelector(`[text-${parameterName}]`);
+      const el = component.querySelector(`[text-${parameterName}]`);
       if (el) {
         el.textContent = text;
       }
     }
 
- export   function updateSrc(obj) {
+ export   function updateSrc(obj, template) {
+  let component = template ?? document;
+
       const parameterName = Object.keys(obj)[0];  // "product"
       const text = obj[parameterName];            // "product"
-      const el = document.querySelector(`[src-${parameterName}]`);
+      const el = component.querySelector(`[src-${parameterName}]`);
       if (el) {
         el.src = text;
       }

@@ -13,110 +13,33 @@
   </div>
 
   <script type="module">
-    import { ref, updateText, updateTexts, updateBinds, createEls, addEvent } from './main.js'
-
+    import {  getState, computed, ref, updateText, updateTexts, updateBinds, createEls, addEvent } from './main.js'
+    import ProductDisplay from './components/ProductDisplay.js'
     const content = 
-`
-<div class="nav-bar"></div>
-    <div class="cart" text-cart></div>
-    <div class="product-display">
-      <div class="product-container">
-        <div class="product-image">    
-          <img v-bind:src="image">
-        </div>
-        <div class="product-info">
-          <h1 v-text="product"></h1>
-          <p v-text="stock"></p>
-          <ul>
-            <li class="a" li-details></li>
-          </ul>
-          <div style-variants="background-color" class="color-circle" div-variants v-on:mouseover="updateVariant"></div>
-
-          <button 
-            v-bind:disabled="notInStock" 
-            class="button"
-            v-bind:class="{disabledButton: notInStock}"
-            v-on:click="addToCart">Add to cart</button>
-        </div>
-      </div>
-    </div>
-`
+  `
+  <div class="nav-bar"></div>
+  <div class="cart" v-text="cart"></div>
+  <div v-component="productDisplay"></div>
+  <div v-component="productDisplay"></div>
+  `
 const app = document.getElementById('app');
 app.innerHTML = content
 
-     function updateStyleFromArray(obj, value) {
-      const parameterName = Object.keys(obj)[0];  // "product"
-      const text = obj[parameterName];            // "product"
-      const els = document.querySelectorAll(`[style-${parameterName}]`);
 
-      for (const el of els) {
-          const id = el.getAttribute('elid')
-          const variant = variants[id]
-          const attr = el.getAttribute(`style-${parameterName}`);
-
-
-        el.style[attr] = variant[value]
-      }
-      
+    const templates = document.querySelectorAll('[v-component=productDisplay]');
+    // console.log(templates)
+    // console.log(template)
+    for (const template of templates) {
+      template.append(ProductDisplay());
     }
 
+    
+    
 
+    const cart = ref(0)
 
-    function updateClass(obj) {
-      const parameterName = Object.keys(obj)[0];
-      const parameterValue = obj[parameterName];
-
-      const els = document.querySelectorAll(`[\\:class]`);
-
-      for (const el of els) {
-        const attrValue = el.getAttribute(':class');
-
-        const content = attrValue.slice(1, -1).trim();
-
-        // Split by colon
-        const [key, value] = content.split(':').map(s => s.trim());
-
-        // Build object
-        const objAttr = { [key]: value };
-
-        // get variable
-        const variableName = Object.keys(objAttr)[0];
-        const variableValue = objAttr[variableName];
-
-        if (variableValue === parameterName) {
-
-          if (parameterValue) {
-
-
-            if (isReactive(variableName)) {
-              el.classList.add(variableName.value)
-
-              variableName._subscribe((newVal) => {
-                el.classList.add(newVal)
-
-              });
-            } else {
-                el.classList.add(variableName)
-
-            }
-
-          }
-        }
-
-        el.disabled = value;
-      }
-    }
-
-    function updateDisabled(obj) {
-      const parameterName = Object.keys(obj)[0];
-      const value = obj[parameterName];
-      const els = document.querySelectorAll(`[\\:disabled="${parameterName}"]`);
-
-      for (const el of els) {
-        el.disabled = value;
-      }
-    }
-
+    /*
+     
 
   // todo: get the variable from a context object, not only one
 
@@ -124,26 +47,10 @@ app.innerHTML = content
    const band = 'Vue Mastery'
     let selectedVariant = 0;
 
-    const addToCart = function () {
-      data.cart++;
-      updateText({data})
-    }
-
-        const variants = [
-      { id: 2234, color: 'green' , image: './assets/images/socks_green.jpeg', quantity: 50},
-      { id: 2235, color: 'blue' , image: './assets/images/socks_blue.jpeg', quantity: 0},
-    ]
-
-    
 
 
-    // const image = computed(() => {
-    //   return variants[selectedVariant].image
-    // })
+       
 
-
-    
-      //let image  = variants[selectedVariant].image
 
     const data = {
       product: product + ' ' + band,
@@ -155,47 +62,9 @@ app.innerHTML = content
       variants
     }
 
+    const state = getState(data)
 
 
-/////////////////////////////////////////////////////////////////
-const state = new Proxy(data, {
-  set(target, key, value) {
-    target[key] = value;
-    // Notify all watchers
-    computedDeps.forEach(fn => fn());
-    return true;
-  }
-});
-
-// Step 2: Computed system
-const computedDeps = [];
-
-export function computed(fn) {
-  const listeners = [];
-  const result = { value: fn() };
-
-  const update = () => {
-    const newVal = fn();
-    result.value = newVal;
-    listeners.forEach(l => l(newVal));
-  };
-
-  result._subscribe = (fn) => listeners.push(fn);
-
-  computedDeps.push(update);
-
-  return result;
-}
-////////////////////////////////////
-
-
-const image = computed(() => state.variants[state.selectedVariant].image);
-
-  const notInStock = computed(() => {
-    return state.variants[state.selectedVariant].quantity > 0
-  })
-
-const stock = computed(() => state.variants[state.selectedVariant].quantity > 0 ? 'In Stock' : 'Out of Stock');
 
   //data.notInStock = notInStock
 
@@ -207,43 +76,27 @@ const updateVariant = function(e) {
 
   }
 
-
 const methods = {
   updateVariant,
   addToCart,
 }
 
-
-
-// Step 3: Use it
-    // updateDisabled({notInStock});
-    // updateClass({notInStock});
-
-    //const product = 'product'
   data.notInStock = notInStock;
   data.stock = stock
 
 
-    updateTexts(data)
+    
     updateBinds('src', {image})
     updateBinds('class', data)
     updateBinds('disabled', data)
 
-    //const image = './assets/images/socks_green.jpeg'
 
-    //updateSrc({image})
-
-    const details = ['50% cotton', '30% wool', '20% polyester']
     createEls('li', {details});
-
-
     createEls('div', {variants})
-
     updateStyleFromArray({variants}, 'color')
-
     addEvent('click', methods)
     addEvent('mouseover', methods)
-
+*/
   </script>
 </body>
 </html>
