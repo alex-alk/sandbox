@@ -20,7 +20,6 @@
   <div class="nav-bar"></div>
   <div class="cart" v-text="cart"></div>
   <div v-component="productDisplay"></div>
-  <div v-component="productDisplay"></div>
   `
 const app = document.getElementById('app');
 app.innerHTML = content
@@ -29,8 +28,11 @@ app.innerHTML = content
     const templates = document.querySelectorAll('[v-component=productDisplay]');
     // console.log(templates)
     // console.log(template)
+
+    const premium = false
+
     for (const template of templates) {
-      template.append(ProductDisplay());
+      template.append(ProductDisplay(premium));
     }
 
     

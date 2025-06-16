@@ -249,15 +249,19 @@ export    function updateTexts(data, template = null) {
 
       for (const el of els) {
         const attrValue = el.getAttribute('v-text');
-        const dataValue = data[attrValue];
 
-        if (isReactive(dataValue)) {
-          el.textContent = dataValue.value;
-          dataValue._subscribe((newVal) => {
-            el.textContent = newVal;
-          });
-        } else {
-          el.textContent = dataValue;
+        const dataValue = data[attrValue];
+        if (dataValue) {
+
+          if (isReactive(dataValue)) {
+            el.textContent = dataValue.value;
+          
+            dataValue._subscribe((newVal) => {
+              el.textContent = newVal;
+            });
+          } else {
+            el.textContent = dataValue;
+          }
         }
       }
     }
@@ -266,12 +270,30 @@ export    function updateTexts(data, template = null) {
 
       let component = template ?? document;
 
-      const parameterName = Object.keys(obj)[0];  // "product"
-      const text = obj[parameterName];            // "product"
+      const parameterName = Object.keys(data)[0];  // "product"
+      const text = data[parameterName];            // "product"
+
       
-      const el = component.querySelector(`[text-${parameterName}]`);
-      if (el) {
-        el.textContent = text;
+      const els = component.querySelectorAll(`[v-text="${parameterName}"]`);
+
+      for (const el of els) {
+        const attrValue = el.getAttribute(`v-text="${parameterName}"}`);
+        const dataValue = data[parameterName];
+
+        if (isReactive(dataValue)) {
+          
+
+
+          el.textContent = dataValue.value
+
+
+          dataValue._subscribe((newVal) => {
+            
+            el.textContent = newVal;
+          });
+        } else {
+          el.textContent = dataValue;
+        }
       }
     }
 

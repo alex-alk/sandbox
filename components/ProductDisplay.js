@@ -1,6 +1,6 @@
 import { getState, computed, ref, updateText, updateTexts, updateBinds, createEls, addEvent } from "../main.js";
 
-export default function ProductDisplay() {
+export default function ProductDisplay(premium) {
 
 const templ = `
 <div class="product-display">
@@ -11,6 +11,7 @@ const templ = `
         <div class="product-info">
             <h1 v-text="product"></h1>
             <p v-text="stock"></p>
+            <p v-text="shipping"></p>
             <ul>
                 <li class="a" li-details></li>
             </ul>
@@ -67,11 +68,14 @@ const data = {
       
       selectedVariant,
       //image,
-      variants
+      variants,
+      premium
 }
 
 const state = getState(data)
 
+const shipping = computed(() => state.premium ? 'Shipping: Free' : 'Shipping: 2.99' )
+updateText({shipping}, productDisplay)
 
 const image = computed(() => state.variants[state.selectedVariant].image);
 
