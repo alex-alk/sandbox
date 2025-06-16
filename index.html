@@ -15,6 +15,7 @@
   <script type="module">
     import {  getState, computed, ref, updateText, updateTexts, updateBinds, createEls, addEvent } from './main.js'
     import ProductDisplay from './components/ProductDisplay.js'
+
     const content = 
   `
   <div class="nav-bar"></div>
@@ -55,65 +56,6 @@ app.innerHTML = content
     }
     addEvent('add-to-cart', methods)
 
-    /*
-     
-
-  // todo: get the variable from a context object, not only one
-
-   const product = 'Socks'
-   const band = 'Vue Mastery'
-    let selectedVariant = 0;
-
-
-
-       
-
-
-    const data = {
-      product: product + ' ' + band,
-      
-      cart: ref(0),
-      
-      selectedVariant,
-      //image,
-      variants
-    }
-
-    const state = getState(data)
-
-
-
-  //data.notInStock = notInStock
-
-const updateVariant = function(e) {
-    const id = e.target.getAttribute('elid')
-    // const obj = variants.find(v => v.id == id)
-    // updateSrc({image: obj.image})
-    state.selectedVariant = id;
-
-  }
-
-const methods = {
-  updateVariant,
-  addToCart,
-}
-
-  data.notInStock = notInStock;
-  data.stock = stock
-
-
-    
-    updateBinds('src', {image})
-    updateBinds('class', data)
-    updateBinds('disabled', data)
-
-
-    createEls('li', {details});
-    createEls('div', {variants})
-    updateStyleFromArray({variants}, 'color')
-    addEvent('click', methods)
-    addEvent('mouseover', methods)
-*/
   </script>
 </body>
 </html>

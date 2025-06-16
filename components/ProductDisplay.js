@@ -1,4 +1,6 @@
 import { defineEmits, getState, computed, ref, updateText, updateTexts, updateBinds, createEls, addEvent } from "../main.js";
+    import ReviewForm from './ReviewForm.js'
+    import ReviewList from './ReviewList.js'
 
 export default function ProductDisplay(premium) {
 
@@ -24,11 +26,32 @@ const templ = `
             v-on:click="addToCart">Add to cart</button>
         </div>
     </div>
+    <div v-component="reviewList"></div>
+    <div v-component="reviewForm" v-on:review-submitted="addReview"></div>
 </div>`
 
 const templateEl = document.createElement('template');
 templateEl.innerHTML = templ.trim(); // trim() avoids stray whitespace
 const productDisplay = templateEl.content
+
+const reviews = ref([
+
+])
+
+const addReview = (review) => {
+    console.log('addReview is called')
+    reviews.value.push(review)
+}
+
+
+const templates = productDisplay.querySelectorAll('[v-component=reviewForm]');
+for (const template of templates) {
+    template.append(ReviewForm());
+}
+const templatesf = productDisplay.querySelectorAll('[v-component=reviewList]');
+for (const template of templatesf) {
+    template.append(ReviewList(reviews));
+}
 
 const details = ['50% cotton', '30% wool', '20% polyester']
 const variants = [
@@ -104,6 +127,7 @@ const addToCart = function () {
 const methods = {
   updateVariant,
   addToCart,
+  addReview
 }
 
   data.notInStock = notInStock;
@@ -121,6 +145,7 @@ createEls('div', {variants}, productDisplay)
 updateStyleFromArray({variants}, 'color', productDisplay)
 addEvent('click', methods, productDisplay)
 addEvent('mouseover', methods, productDisplay)
+addEvent('review-submitted', methods, productDisplay)
 
 return productDisplay;
 

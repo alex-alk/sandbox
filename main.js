@@ -1,6 +1,35 @@
 // Step 2: Computed system
 const computedDeps = [];
 
+export function bindReactive(review, template) {
+
+  let component = template ?? document;
+
+  const inputs = component.querySelectorAll('[v-model]');
+  for (const el of inputs) {
+    // e.g. el.getAttribute('v-model') → "review.name"
+    const prop = el.getAttribute('v-model').split('.').pop();
+    
+    // 1) init
+    el.value = review[prop];
+
+    // 2) respond to user
+    el.addEventListener('input', e => {
+      // if you have v-model.number you can coerce to Number here
+      review[prop] = el.hasAttribute('v-model.number')
+        ? Number(el.value)
+        : el.value;
+    });
+
+    // 3) respond to code
+    review._subscribe(prop, newVal => {
+      if (document.activeElement !== el) {
+        el.value = newVal;
+      }
+    });
+  }
+}
+
 export function computed(fn) {
   const listeners = [];
   const result = { value: fn() };
@@ -39,6 +68,36 @@ export function getState(data) {
 //   }
 // });
 
+/**
+ * Make an object reactive:  
+ *   - you can read/write its props as usual  
+ *   - subscribe to changes via proxy._subscribe(propName, callback)  
+ */
+export function reactive(initialObj) {
+  // internal map: propName → [listenerFn, …]
+  const subs = {};
+
+  return new Proxy({...initialObj }, {
+    get(target, key) {
+      if (key === '_subscribe') {
+        // usage: reactiveObj._subscribe('name', newVal => { … })
+        return (propName, fn) => {
+          if (!subs[propName]) subs[propName] = [];
+          subs[propName].push(fn);
+        };
+      }
+      return target[key];
+    },
+    set(target, key, value) {
+      target[key] = value;
+      // notify any subscribers to this key
+      if (subs[key]) {
+        subs[key].forEach(fn => fn(value));
+      }
+      return true;
+    }
+  });
+}
 
 
 export function ref(initialValue) {
@@ -140,8 +199,6 @@ function isReactive(val) {
 
         } else  {
           if (isReactive(dataValue)) {
-            // console.log('attr', attrValue);
-            // console.log('dv', dataValue.value)
 
             el[type] = dataValue.value;
             dataValue._subscribe((newVal) => {
@@ -265,13 +322,12 @@ export    function updateTexts(data, template = null) {
       }
     }
 
-    export    function updateText(data, template) {
+    export function updateText(data, template) {
 
       let component = template ?? document;
 
       const parameterName = Object.keys(data)[0];  // "product"
       const text = data[parameterName];            // "product"
-
       
       const els = component.querySelectorAll(`[v-text="${parameterName}"]`);
 
@@ -313,7 +369,7 @@ export    function updateTexts(data, template = null) {
  * @param {HTMLElement} rootEl — the root element of the component
  */
 export function defineEmits(emits, rootEl) {
-  console.log('defineEmits', emits)
+
   return (eventName, payload = null) => {
     if (!emits.includes(eventName)) {
       throw new Error(`[defineEmits] "${eventName}" is not declared in ${JSON.stringify(emits)}`);
@@ -322,7 +378,6 @@ export function defineEmits(emits, rootEl) {
       detail: payload,
       bubbles: true,
     });
-    console.log('dispatch', ev)
     rootEl.dispatchEvent(ev);
   };
 }
