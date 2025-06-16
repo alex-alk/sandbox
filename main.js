@@ -77,7 +77,6 @@ export function addEvent(type, data, template) {
         // get variable
         const dataValue = data[attrValue];
 
-
         el.addEventListener(type, dataValue);
       }
     }
@@ -307,3 +306,23 @@ export    function updateTexts(data, template = null) {
         el.src = text;
       }
     }
+
+
+/**
+ * @param {string[]} emits — the list of event names your component can emit
+ * @param {HTMLElement} rootEl — the root element of the component
+ */
+export function defineEmits(emits, rootEl) {
+  console.log('defineEmits', emits)
+  return (eventName, payload = null) => {
+    if (!emits.includes(eventName)) {
+      throw new Error(`[defineEmits] "${eventName}" is not declared in ${JSON.stringify(emits)}`);
+    }
+    const ev = new CustomEvent(eventName, {
+      detail: payload,
+      bubbles: true,
+    });
+    console.log('dispatch', ev)
+    rootEl.dispatchEvent(ev);
+  };
+}

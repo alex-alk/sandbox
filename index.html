@@ -19,7 +19,7 @@
   `
   <div class="nav-bar"></div>
   <div class="cart" v-text="cart"></div>
-  <div v-component="productDisplay"></div>
+  <div v-component="productDisplay" v-on:add-to-cart="updateCart"></div>
   `
 const app = document.getElementById('app');
 app.innerHTML = content
@@ -31,14 +31,29 @@ app.innerHTML = content
 
     const premium = false
 
+
+
     for (const template of templates) {
       template.append(ProductDisplay(premium));
     }
 
-    
-    
-
     const cart = ref(0)
+    const cartItems = []
+    
+    const data = {
+      cart
+    }
+    updateText({cart})
+
+    const updateCart = function (id) {
+      cartItems.push(id);
+      cart.value = cartItems.length
+    }
+
+    const methods = {
+      updateCart
+    }
+    addEvent('add-to-cart', methods)
 
     /*
      

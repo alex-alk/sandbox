@@ -1,4 +1,4 @@
-import { getState, computed, ref, updateText, updateTexts, updateBinds, createEls, addEvent } from "../main.js";
+import { defineEmits, getState, computed, ref, updateText, updateTexts, updateBinds, createEls, addEvent } from "../main.js";
 
 export default function ProductDisplay(premium) {
 
@@ -29,8 +29,6 @@ const templ = `
 const templateEl = document.createElement('template');
 templateEl.innerHTML = templ.trim(); // trim() avoids stray whitespace
 const productDisplay = templateEl.content
-
-
 
 const details = ['50% cotton', '30% wool', '20% polyester']
 const variants = [
@@ -94,11 +92,14 @@ const updateVariant = function(e) {
     // updateSrc({image: obj.image})
     state.selectedVariant = id;
 
-  }
-      const addToCart = function () {
-      data.cart++;
-      updateText({data})
-    }
+}
+const root = productDisplay.firstElementChild;
+const emit = defineEmits(['add-to-cart'], root)
+
+const addToCart = function () {
+    emit('add-to-cart', state.variants[state.selectedVariant].id)
+}
+
 
 const methods = {
   updateVariant,
@@ -122,4 +123,5 @@ addEvent('click', methods, productDisplay)
 addEvent('mouseover', methods, productDisplay)
 
 return productDisplay;
+
 }
