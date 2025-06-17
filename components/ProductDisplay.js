@@ -17,13 +17,21 @@ const templ = `
             <ul>
                 <li class="a" v-for="details"></li>
             </ul>
-            <div style-variants="background-color" class="color-circle" v-for="variants" v-on:mouseover="updateVariant"></div>
+            
+            <div 
+                v-for="(variant, index) in variants" 
+                :key="variant.id"
+                @mouseover="updateVariant(index)"
+                class="color-circle"
+                :style="{ backgroundColor: variant.color }"
+            >
 
-            <button 
-            v-bind:disabled="notInStock" 
-            class="button"
-            v-bind:class="{disabledButton: notInStock}"
-            v-on:click="addToCart">Add to cart</button>
+            <button
+                class="button" 
+                :class="{ disabledButton: !inStock }"
+                :disabled="!inStock"
+                v-on:click="addToCart"
+            >Add to cart</button>
         </div>
     </div>
     <div v-if="reviews.length > 0" v-component="reviewList"></div>
@@ -77,7 +85,7 @@ let component = template ?? document;
           const variant = variants[id]
           const attr = el.getAttribute(`style-${parameterName}`);
 
-
+        console.log(variants, id, value, el)
         el.style[attr] = variant[value]
       }
       
@@ -111,6 +119,10 @@ return state.variants[state.selectedVariant].quantity > 0
 
 const stock = computed(() => state.variants[state.selectedVariant].quantity > 0 ? 'In Stock' : 'Out of Stock');
 
+const inStock = computed(() => {
+  return state.variants[state.selectedVariant].quantity > 0
+})
+
 updateTexts(data, productDisplay)
 
 
@@ -137,17 +149,19 @@ const methods = {
 
   data.notInStock = notInStock;
   data.stock = stock
+  data.inStock = inStock
+  data.image = image
 
 
     
-updateBinds('src', {image}, productDisplay)
-updateBinds('class', data, productDisplay)
-updateBinds('disabled', data, productDisplay)
+//updateBinds({image}, productDisplay)
+updateBinds(data, productDisplay)
+// updateBinds('disabled', data, productDisplay)
 
 
 createEls({details}, productDisplay);
 createEls({variants}, productDisplay)
-updateStyleFromArray({variants}, 'color', productDisplay)
+//updateStyleFromArray({variants}, 'color', productDisplay)
 addEvent('click', methods, productDisplay)
 addEvent('mouseover', methods, productDisplay)
 addEvent('review-submitted', methods, productDisplay)

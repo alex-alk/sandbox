@@ -1,77 +1,3 @@
-export function setTexts(obj, component) {
-    const texts = component.querySelectorAll('[f-text]');
-
-    for (const el of texts) {
-        const attributeValue = el.getAttribute('f-text');
-        el.textContent =  obj[attributeValue]
-    }
-}
-
-export function setText(obj, component) {
-    const firstKey = Object.keys(obj)[0]
-    const texts = component.querySelectorAll(`[f-text="${firstKey}"]`);
-
-    for (const el of texts) {
-        el.textContent = obj[firstKey]
-    }
-    
-}
-
-export function setBind(type, obj, component) {
-
-    const texts = component.querySelectorAll(`[f-bind\\:${type}]`);
-
-    for (const el of texts) {
-        const attributeValue = el.getAttribute(`f-bind:${type}`);
-        el[type] =  obj[attributeValue]
-    }
-}
-
-export function setEvent(type, obj, component) {
-
-    const texts = component.querySelectorAll(`[f-on\\:${type}]`);
-
-    for (const el of texts) {
-        const attributeValue = el.getAttribute(`f-on:${type}`);
-        el.addEventListener(type, obj[attributeValue])
-    }
-}
-
-export function setFor(obj, component) {
-
-    const texts = component.querySelectorAll('[f-for]')
-
-    for (const el of texts) {
-        const attributeValue = el.getAttribute('f-for')
-        const constituents = attributeValue.split('::')
-
-        const parent = el.parentElement
-        const original = el.cloneNode(true)
-        el.remove()
-
-        const array =  obj[constituents[0]]
-        
-        for (const arrEl of array) {
-            const clone = original.cloneNode(true)
-            if (constituents.length === 1) {
-                clone.textContent = arrEl
-            } else if (constituents.length === 2) {
-                clone.textContent = arrEl[constituents[1]]
-                if (arrEl['id']) {
-                    clone.setAttribute('elid', arrEl['id'])
-                }
-            }
-            
-            parent.appendChild(clone);
-        }
-    }
-}
-
-
-
-
-
-
 // Step 2: Computed system
 const computedDeps = [];
 
@@ -132,23 +58,6 @@ export function getState(data) {
   }
 });
 }
-
-// export const state = new Proxy(data, {
-//   set(target, key, value) {
-//     target[key] = value;
-//     // Notify all watchers
-//     computedDeps.forEach(fn => fn());
-//     return true;
-//   }
-// });
-
-/**
- * Make an object *or* array reactive:
- * 
- * - You can read/write props or numeric indices as usual.
- * - Subscribe to a specific key: proxy._subscribe('foo', newVal => …)
- * - Subscribe to *all* changes:    proxy._subscribe(fn) // fn gets (newVal, key)
- */
 export function reactive(initial) {
   // If it's an array, keep it as-is so forEach/etc still exist.
   const target = Array.isArray(initial) ? initial : { ...initial };
@@ -188,12 +97,6 @@ export function reactive(initial) {
   });
 }
 
-
-/**
- * Make an object reactive:  
- *   - you can read/write its props as usual  
- *   - subscribe to changes via proxy._subscribe(propName, callback)  
- */
 export function reactive_(initialObj) {
   // internal map: propName → [listenerFn, …]
   const subs = {};
@@ -219,9 +122,6 @@ export function reactive_(initialObj) {
     }
   });
 }
-
-
-
 
 export function ref(initialValue) {
   const listeners = [];
@@ -267,14 +167,6 @@ export function ref(initialValue) {
   };
 }
 
-
-/**
- * Replace {{ expr }} in text nodes under `root` with values from `data`,
- * and re‑render reactively when any ref()/reactive() in `data` changes.
- *
- * @param {{ [key: string]: any }} data
- * @param {DocumentFragment|HTMLElement} [root=document]
- */
 export function updateCurly(data, root = document) {
   // 1) Find every text node containing a {{…}} template
   const mustacheRE = /{{\s*([^}]+?)\s*}}/g;
@@ -335,7 +227,6 @@ export function updateCurly(data, root = document) {
   });
 }
 
-
 export function ref_(initialValue) {
   const listeners = [];
 
@@ -379,13 +270,6 @@ export function addEvent(type, methods, template = null) {
   }
 }
 
-
-/**
- * Toggle elements with v-if / v-else based on JS expressions in the context of `data`.
- *
- * @param {object} data                — e.g. { inStock: computed(() => …), cart: ref(0), … }
- * @param {DocumentFragment|HTMLElement} [templateRoot=document]
- */
 export function updateIf(data, templateRoot = null) {
   const root = templateRoot ?? document;
   // get all v-if / v-else in document order
@@ -435,9 +319,6 @@ export function updateIf(data, templateRoot = null) {
   });
 }
 
-
-
-
 export function addEvent__(type, data, template) {
 
   let component = template ?? document;
@@ -462,8 +343,6 @@ function isReactive(val) {
 }
 
 
-
-
 export function updateBinds(data, root = document) {
   const allEls = root.querySelectorAll('*');
   const keys   = Object.keys(data);
@@ -478,6 +357,8 @@ export function updateBinds(data, root = document) {
 
       const expr = attr.value;
       const fn   = new Function(...keys, `return ${expr};`);
+
+      console.log(data)
 
       function apply() {
         const args = keys.map(k => {
@@ -521,15 +402,6 @@ export function updateBinds(data, root = document) {
   });
 }
 
-
-
-
-
-/**
- * @param {{ [arrayName: string]: any[]|Ref|Reactive }} obj
- * @param {DocumentFragment|HTMLElement} [root=document]
- * @param {object} [methods={}]   – name→fn for inline v-on / @ handlers
- */
 export function createEls(obj, root = document, methods = {}) {
   const arrayName = Object.keys(obj)[0];
   const source    = obj[arrayName];
@@ -649,18 +521,6 @@ export function createEls(obj, root = document, methods = {}) {
 }
 
 
-
-
-
-
-
-/**
- * Renders one clone per item in a reactive or plain array/ref/array‑like,
- * and re‑renders whenever the array changes.
- *
- * @param {{ [arrayName: string]: any[]|Ref } } obj
- * @param {DocumentFragment|HTMLElement} [templateRoot=document]
- */
 export function createEls___(obj, templateRoot = null) {
   const root      = templateRoot ?? document;
   const arrayName = Object.keys(obj)[0];
@@ -726,18 +586,6 @@ export function createEls___(obj, templateRoot = null) {
   }
 }
 
-
-
-
-
-/**
- * For each element matching [v-for="arrayName"] in `templateRoot`,
- * deep‑clone the original node (preserving tagName, attributes, children),
- * set an elid=index on each clone, and append them to the parent.
- *
- * @param {{ [arrayName: string]: any[] }} obj      — e.g. { reviews: [...] }
- * @param {DocumentFragment|HTMLElement} [templateRoot=document]
- */
 export function createEls__(obj, templateRoot = null) {
   const root = templateRoot ?? document;
   const arrayName = Object.keys(obj)[0];        // e.g. "reviews"
@@ -765,7 +613,6 @@ export function createEls__(obj, templateRoot = null) {
     parent.appendChild(el);
   });
 }
-
 
 export function createEls_(type, obj, template) {
 
@@ -867,12 +714,6 @@ export    function updateTexts(data, template = null) {
       }
     }
 
-  /**
- * Update all [v-text="…"] nodes inside `template` (or document)
- * Supports:
- *   - simple refs:    { cart: ref(0) }            + <span v-text="cart"></span>
- *   - reactive props: { review: reactive({name}) } + <span v-text="review.name"></span>
- */
 export function updateText(data, template = null) {
   const root = template ?? document;
   const els = root.querySelectorAll('[v-text]');
@@ -913,8 +754,6 @@ export function updateText(data, template = null) {
   });
 }
 
-
-
  export   function updateSrc(obj, template) {
   let component = template ?? document;
 
@@ -926,11 +765,6 @@ export function updateText(data, template = null) {
       }
     }
 
-
-/**
- * @param {string[]} emits — the list of event names your component can emit
- * @param {HTMLElement} rootEl — the root element of the component
- */
 export function defineEmits(emits, rootEl) {
 
   return (eventName, payload = null) => {

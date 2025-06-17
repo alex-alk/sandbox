@@ -13,68 +13,49 @@
   </div>
 
   <script type="module">
+    import {  getState, computed, ref, updateText, updateTexts, updateBinds, createEls, addEvent } from './main.js'
+    import ProductDisplay from './components/ProductDisplay.js'
 
-import { setText, setTexts, setBind, setFor, setEvent } from './main.js'
-
-const content = 
-`<div class="nav-bar"></div>
-  <div class="cart" f-text="cart"></div>
-  <div class="product-display">
-    <div class="product-container">
-      <div class="product-image">    
-        <img f-bind:src="image">
-      </div>
-      <div class="product-info">
-        <h1 f-text="product"></h1>
-        <p f-text="inStockText"></p>
-        <ul>
-          <li f-for="details"></li>
-        </ul>
-        <div f-for="variants::color" f-on:mouseover="updateImage"></div>
-        <button 
-          class="button"
-          f-bind:className="inStock"
-          f-on:click="addToCart">Add to cart</button>
-      </div>
-    </div>
-  </div>`
-
+    const content = 
+  `
+  <div class="nav-bar"></div>
+  <div class="cart" v-text="cart"></div>
+  <div v-component="productDisplay" v-on:add-to-cart="updateCart"></div>
+  `
 const app = document.getElementById('app');
 app.innerHTML = content
 
-const socksGreenImage = './assets/images/socks_green.jpeg'
-const socksBlueImage = './assets/images/socks_blue.jpeg'
 
-const product = 'Socks';
-const image = socksGreenImage
-const inStock = true
-const inStockText = inStock ? 'In Stock' : 'Out of Stock'
-let cart = 0
+    const templates = document.querySelectorAll('[v-component=productDisplay]');
+    // console.log(templates)
+    // console.log(template)
 
-const details = ['50% cotton', '30% wool', '20% polyester']
-const variants = [
-  { id: 2234, color: 'green' , image: socksGreenImage},
-  { id: 2235, color: 'blue' , image: socksBlueImage},
-]
-
-function addToCart() {
-  cart++
-  setText({cart}, app)
-}
-
-function updateImage(e) {
-  console.log(e.target)
-  const id = e.target.getAttribute('elid')
-  setBind('src', {image: variants.find(variant => variant.id == id).image}, app)
-}
-
-setTexts({product, inStockText, cart}, app)
-setBind('src', {image}, app)
-setFor({details, variants}, app)
-setEvent('click', {addToCart}, app)
-setEvent('mouseover', {updateImage}, app)
+    const premium = false
 
 
-</script>
+
+    for (const template of templates) {
+      template.append(ProductDisplay(premium));
+    }
+
+    const cart = ref(0)
+    const cartItems = []
+    
+    const data = {
+      cart
+    }
+    updateText({cart})
+
+    const updateCart = function (id) {
+      cartItems.push(id);
+      cart.value = cartItems.length
+    }
+
+    const methods = {
+      updateCart
+    }
+    addEvent('add-to-cart', methods)
+
+  </script>
 </body>
 </html>
