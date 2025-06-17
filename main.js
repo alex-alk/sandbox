@@ -194,6 +194,72 @@ export function ref(initialValue) {
 }
 
 
+/**
+ * Replace {{ expr }} in text nodes under `root` with values from `data`,
+ * and re‑render reactively when any ref()/reactive() in `data` changes.
+ *
+ * @param {{ [key: string]: any }} data
+ * @param {DocumentFragment|HTMLElement} [root=document]
+ */
+export function updateCurly(data, root = document) {
+  // 1) Find every text node containing a {{…}} template
+  const mustacheRE = /{{\s*([^}]+?)\s*}}/g;
+  const walker = document.createTreeWalker(
+    root,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(node) {
+        return mustacheRE.test(node.nodeValue)
+          ? NodeFilter.FILTER_ACCEPT
+          : NodeFilter.FILTER_REJECT;
+      }
+    }
+  );
+
+  const entries = [];
+  let node;
+  while ((node = walker.nextNode())) {
+    entries.push({
+      node,
+      template: node.nodeValue
+    });
+  }
+
+  // 2) Render function: replaces all {{expr}} in each saved node
+  function render() {
+    for (const { node, template } of entries) {
+      node.nodeValue = template.replace(mustacheRE, (_, expr) => {
+        // evaluate simple dot‑paths against data
+        const parts = expr.trim().split('.');
+        let val = data[parts[0]];
+        if (val == null) return '';
+        // unwrap ref()
+        if (typeof val.value !== 'undefined') {
+          val = val.value;
+        }
+        // drill into reactive props or nested objects
+        for (let i = 1; i < parts.length; i++) {
+          val = val[parts[i]];
+          if (val == null) return '';
+          if (typeof val.value !== 'undefined') {
+            val = val.value;
+          }
+        }
+        return val != null ? val : '';
+      });
+    }
+  }
+
+  // 3) Initial pass
+  render();
+
+  // 4) Subscribe to all refs/reactives in data
+  Object.values(data).forEach(v => {
+    if (v && typeof v._subscribe === 'function') {
+      v._subscribe(render);
+    }
+  });
+}
 
 
 export function ref_(initialValue) {
@@ -241,46 +307,60 @@ export function addEvent(type, methods, template = null) {
 
 
 /**
- * Toggle elements with v-if based on a JS expression in the context of `data`.
- * Supports refs (unwrapping `.value`) and reactive proxies.
+ * Toggle elements with v-if / v-else based on JS expressions in the context of `data`.
  *
- * @param {object} data                — e.g. { reviews: ref([...]), cart: ref(0), … }
+ * @param {object} data                — e.g. { inStock: computed(() => …), cart: ref(0), … }
  * @param {DocumentFragment|HTMLElement} [templateRoot=document]
  */
 export function updateIf(data, templateRoot = null) {
   const root = templateRoot ?? document;
-  const els  = root.querySelectorAll('[v-if]');
+  // get all v-if / v-else in document order
+  const all = Array.from(root.querySelectorAll('[v-if], [v-else]'));
 
-  // Evaluate all v-if expressions
   function run() {
-    els.forEach(el => {
-      const expr = el.getAttribute('v-if').trim();
-      // Build a function: new Function('reviews','cart', 'return reviews.length>0')
-      const fn = new Function(...Object.keys(data), `return ${expr};`);
-      // Prepare args: unwrap any refs (give .value), otherwise pass raw
-      const args = Object.values(data).map(v =>
-        v && typeof v.value !== 'undefined' ? v.value : v
-      );
-      let result = false;
-      try {
-        result = !!fn(...args);
-      } catch (e) {
-        console.warn('v-if evaluation error:', expr, e);
+    for (let i = 0; i < all.length; i++) {
+      const el = all[i];
+
+      if (el.hasAttribute('v-if')) {
+        const expr = el.getAttribute('v-if').trim();
+        // build fn(dataKeys...) → boolean
+        const fn = new Function(...Object.keys(data), `return ${expr};`);
+        // unwrap refs/reactives
+        const args = Object.values(data).map(v =>
+          v && typeof v.value !== 'undefined' ? v.value : v
+        );
+
+        let ok = false;
+        try { ok = !!fn(...args); }
+        catch (e) { console.warn('v-if error:', expr, e); }
+
+        el.style.display = ok ? '' : 'none';
+
+        // handle paired v-else if it immediately follows in our list
+        const next = all[i + 1];
+        if (next && next.hasAttribute('v-else')) {
+          next.style.display = ok ? 'none' : '';
+          i++; // skip the v-else in the next iteration
+        }
       }
-      el.style.display = result ? '' : 'none';
-    });
+      else if (el.hasAttribute('v-else')) {
+        // an orphan v-else (no preceding v-if) is always hidden
+        el.style.display = 'none';
+      }
+    }
   }
 
+  // initial run
   run();
 
-  // Subscribe to any reactive in data
-  Object.values(data).forEach(v => {
-    if (v && typeof v._subscribe === 'function') {
-      // for refs: subscribe to value‑setter; for reactive arrays/objects: subscribe to any change
-      v._subscribe(run);
+  // subscribe to any reactive in data
+  Object.values(data).forEach(val => {
+    if (val && typeof val._subscribe === 'function') {
+      val._subscribe(run);
     }
   });
 }
+
 
 
 
@@ -307,167 +387,195 @@ function isReactive(val) {
   return typeof val === 'object' && val !== null && 'value' in val && typeof val._subscribe === 'function';
 }
 
-    export function updateBinds(type, data, template) {
-
-      let component = template ?? document;
-
-      //const parameterName = Object.keys(obj)[0];
-      const li = component.querySelectorAll(`[v-bind\\:${type}]`);
-
-      for (const el of li) {
-
-        const attrValue = el.getAttribute(`v-bind:${type}`);
-        // get variable
-        const dataValue = data[attrValue];
-
-        if (type === 'class') {
-
-          const content = attrValue.slice(1, -1).trim();
-
-          // Split by colon
-          const [key, value] = content.split(':').map(s => s.trim());
-
-          // Build object
-          const objAttr = { [key]: value };
-
-          // get variable
-          const variableName = Object.keys(objAttr)[0];
-          const variableValue = objAttr[variableName];
 
 
-          const variableSelected = data[variableValue]
-         
 
-          if (isReactive(variableSelected)) {
-            
-              if (variableSelected.value) {
-                el.classList.add(variableName)
-              }
+export function updateBinds(data, root = document) {
+  const allEls = root.querySelectorAll('*');
+  const keys   = Object.keys(data);
 
-              variableSelected._subscribe((newVal) => {
+  allEls.forEach(el => {
+    Array.from(el.attributes).forEach(attr => {
+      const m = attr.name.match(/^(?::|v-bind:)([\w-]+)$/);
+      if (!m) return;
+      const prop = m[1];
+      // ← IGNORE key entirely
+      if (prop === 'key') return;
 
-                if (newVal) {
-                  el.classList.add(variableName)
-                } else {
-                  el.classList.remove(variableName)
-                }
+      const expr = attr.value;
+      const fn   = new Function(...keys, `return ${expr};`);
 
-              });
-            } else {
-
-                el.classList.add(variableName)
-
-            }
-
-
-        } else  {
-          if (isReactive(dataValue)) {
-
-            el[type] = dataValue.value;
-            dataValue._subscribe((newVal) => {
-              el[type] = newVal;
-            });
-          } else {
-            el[type] = dataValue;
-          }
-
+      function apply() {
+        const args = keys.map(k => {
+          const v = data[k];
+          return v && typeof v.value !== 'undefined' ? v.value : v;
+        });
+        let val;
+        try { val = fn(...args); }
+        catch (e) {
+          console.warn(`v-bind expression error: ${expr}`, e);
+          return;
         }
-        
+
+        if (prop === 'class' && typeof val === 'object') {
+          Object.entries(val).forEach(([cls, cond]) => {
+            el.classList[cond ? 'add' : 'remove'](cls);
+          });
+        } else if (typeof el[prop] === 'boolean') {
+        // boolean DOM properties, e.g. disabled
+          el[prop] = !!val;
+        } else if (prop in el && typeof el[prop] !== 'function') {
+          // normal DOM property (covers `src`, `href`, `value`, etc.)
+          el[prop] = val;
+        } else if (prop in el.style && typeof val === 'string') {
+          // inline style
+          el.style[prop] = val;
+        } else {
+          // fallback to attribute
+          el.setAttribute(prop, val);
+        }
       }
-    }
+
+      apply();
+      Object.values(data).forEach(v => {
+        if (v && typeof v._subscribe === 'function') {
+          v._subscribe(apply);
+        }
+      });
+      el.removeAttribute(attr.name);
+    });
+  });
+}
+
 
 
 
 
 /**
- * Renders a <… v-for="arrayName"> template for each item,
- * binds each clone to both the full array and its singular item,
- * and re‑renders whenever the array changes.
- *
- * @param {{ [arrayName: string]: any[]|Ref }} obj
- * @param {DocumentFragment|HTMLElement} [templateRoot=document]
+ * @param {{ [arrayName: string]: any[]|Ref|Reactive }} obj
+ * @param {DocumentFragment|HTMLElement} [root=document]
+ * @param {object} [methods={}]   – name→fn for inline v-on / @ handlers
  */
-export function createEls(obj, templateRoot = null) {
-  const root      = templateRoot ?? document;
-  const arrayName = Object.keys(obj)[0];        // e.g. "reviews"
-  const source    = obj[arrayName];             // array, ref or reactive
+export function createEls(obj, root = document, methods = {}) {
+  const arrayName = Object.keys(obj)[0];
+  const source    = obj[arrayName];
 
-  // determine how to read & subscribe
+  // 1) Array getter + subscribe (same as before)
   let getList, subscribe;
-  if (source && typeof source._subscribe === "function" && "value" in source) {
-    // ref([...])
+  if (source && typeof source._subscribe === 'function' && 'value' in source) {
     getList   = () => Array.from(source.value || []);
-    subscribe = cb => source._subscribe(cb);
-  } else if (source && typeof source._subscribe === "function" && "length" in source) {
-    // reactive([...])
+    subscribe = fn => source._subscribe(fn);
+  } else if (source && typeof source._subscribe === 'function') {
     getList   = () => Array.from(source);
-    subscribe = cb => source._subscribe(cb);
+    subscribe = fn => source._subscribe(fn);
   } else {
-    // plain array
     getList   = () => Array.from(source || []);
     subscribe = null;
   }
 
-  // derive singular name (reviews → review)
-  const singular = arrayName.endsWith("s")
-    ? arrayName.slice(0, -1)
-    : "item";
+  // 2) Find all <… v-for="… in arrayName">
+  const templates = Array.from(
+    root.querySelectorAll(`[v-for*="${arrayName}"]`)
+  ).filter(el => {
+    const v = el.getAttribute('v-for').trim();
+    return v === arrayName || v.endsWith(` in ${arrayName}`);
+  });
 
-  // locate template node
-  const tpl = root.querySelector(`[v-for="${arrayName}"]`);
-  if (!tpl) return;
-  const parent = tpl.parentElement;
+  templates.forEach(tpl => {
+    const rawExpr = tpl.getAttribute('v-for').trim();
+    // parse singular name
+    const singular = rawExpr.includes(' in ')
+      ? rawExpr.split(' in ')[0].trim()
+      : (arrayName.endsWith('s') ? arrayName.slice(0,-1) : 'item');
 
-  // clone & remove placeholder
-  const proto = tpl.cloneNode(true);
-  parent.removeChild(tpl);
+    // detect key
+    let keyExpr = null;
+    if (tpl.hasAttribute(':key'))           keyExpr = tpl.getAttribute(':key').trim();
+    else if (tpl.hasAttribute('v-bind:key')) keyExpr = tpl.getAttribute('v-bind:key').trim();
 
-  // insertion marker
-  const marker = document.createComment(`v-for ${arrayName}`);
-  parent.appendChild(marker);
+    // replace template with marker
+    const parent = tpl.parentElement;
+    const proto  = tpl.cloneNode(true);
+    parent.removeChild(tpl);
+    const marker = document.createComment(`v-for ${rawExpr}`);
+    parent.appendChild(marker);
 
-  let clones = [];
+    let clones = [];
+    function render() {
+      // remove old
+      clones.forEach(n => parent.removeChild(n));
+      clones = [];
 
-  function render() {
-    // teardown old clones
-    clones.forEach(n => parent.removeChild(n));
-    clones = [];
+      const list = getList();
+      list.forEach((item, idx) => {
+        const el = proto.cloneNode(true);
+        parent.insertBefore(el, marker);
+        clones.push(el);
 
-    // rebuild from current list
-    getList().forEach((item, idx) => {
-      const el = proto.cloneNode(true);
-      el.setAttribute("elid", idx);
-      parent.insertBefore(el, marker);
-      clones.push(el);
+        // build context
+        const ctx = {
+          [arrayName]: list,
+          [singular]:  item,
+          ...methods
+        };
 
-      // per‑clone context: full array + this item
-      const ctx = {
-        [arrayName]: getList(),
-        [singular]:  item
-      };
+        // key
+        if (keyExpr) {
+          const fnKey = new Function(singular, arrayName, `return ${keyExpr};`);
+          let k;
+          try { k = fnKey(item, list); } catch { k = idx; }
+          el.setAttribute('key', k);
+        }
 
-      // apply all your directives to this clone
-      updateText(ctx,      el);
-      updateTexts(ctx,     el);
-      updateBinds("src",      ctx, el);
-      updateBinds("class",    ctx, el);
-      updateBinds("disabled", ctx, el);
+        // run interpolation + v-text etc.
+        updateCurly(ctx, el);
+        updateText(ctx, el);
+        updateTexts(ctx, el);
+        updateBinds(ctx, el);
 
-      // wire up v-on: for common events
-      ["click", "mouseover", "submit"].forEach(evt =>
-        addEvent(evt, ctx, el)
-      );
-    });
-  }
+        // 3) handle :style / v-bind:style
+        if (el.hasAttribute(':style') || el.hasAttribute('v-bind:style')) {
+          const expr = (el.getAttribute(':style') || el.getAttribute('v-bind:style')).trim();
+          // build a fn that returns an object
+          const fnStyle = new Function(singular, arrayName, `return ${expr};`);
+          let styleObj = {};
+          try { styleObj = fnStyle(item, list) || {}; }
+          catch (e) { console.warn('v-bind:style error', expr, e); }
+          // apply each key
+          Object.entries(styleObj).forEach(([prop, val]) => {
+            // camelCase prop on element.style
+            el.style[prop] = val;
+          });
+          el.removeAttribute(':style');
+          el.removeAttribute('v-bind:style');
+        }
 
-  // initial render
-  render();
+        // 4) inline event handlers: @evt or v-on:evt
+        Array.from(el.attributes).forEach(attr => {
+          // match either @evt or v-on:evt
+          const m = attr.name.match(/^(?:@|v-on:)([\w-]+)$/);
+          if (!m) return;
+          const eventName = m[1];
+          const expr      = attr.value.trim();
+          // create fn that has (singular, arrayName, ...methods, event)
+          const fnEvt = new Function(
+            ...Object.keys(ctx), 
+            'event',
+            `return ${expr};`
+          );
+          el.addEventListener(eventName, e => fnEvt(...Object.values(ctx), e));
+          el.removeAttribute(attr.name);
+        });
+      });
+    }
 
-  // re-render on mutations
-  if (subscribe) {
-    subscribe(() => render());
-  }
+    render();
+    if (subscribe) subscribe(render);
+  });
 }
+
+
+
 
 
 

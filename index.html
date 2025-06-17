@@ -13,49 +13,64 @@
   </div>
 
   <script type="module">
-    import {  getState, computed, ref, updateText, updateTexts, updateBinds, createEls, addEvent } from './main.js'
-    import ProductDisplay from './components/ProductDisplay.js'
 
-    const content = 
-  `
-  <div class="nav-bar"></div>
-  <div class="cart" v-text="cart"></div>
-  <div v-component="productDisplay" v-on:add-to-cart="updateCart"></div>
-  `
+import {  } from './main.js'
+
+const content = 
+`<div class="product-display">
+    <div class="product-container">
+      <div class="product-info">
+        <h1>{{ product }}</h1>
+      </div>
+    </div>
+  </div>`
+
 const app = document.getElementById('app');
 app.innerHTML = content
 
 
-    const templates = document.querySelectorAll('[v-component=productDisplay]');
-    // console.log(templates)
-    // console.log(template)
+const socksGreenImage = './assets/images/socks_green.jpeg'
+const socksBlueImage = './assets/images/socks_blue.jpeg'
+  
+const product = ref('Socks')
+const brand = ref('Vue Mastery')
 
-    const premium = false
+const selectedVariant = ref(0)
 
+const details = ref(['50% cotton', '30% wool', '20% polyester'])
 
+const variants = ref([
+  { id: 2234, color: 'green', image: socksGreenImage, quantity: 50 },
+  { id: 2235, color: 'blue', image: socksBlueImage, quantity: 0 },
+])
 
-    for (const template of templates) {
-      template.append(ProductDisplay(premium));
-    }
+const cart = ref(0)
 
-    const cart = ref(0)
-    const cartItems = []
-    
-    const data = {
-      cart
-    }
-    updateText({cart})
+const title = computed(() => {
+  return brand.value + ' ' + product.value
+})
 
-    const updateCart = function (id) {
-      cartItems.push(id);
-      cart.value = cartItems.length
-    }
+const image = computed(() => {
+  return variants.value[selectedVariant.value].image
+})
 
-    const methods = {
-      updateCart
-    }
-    addEvent('add-to-cart', methods)
+const inStock = computed(() => {
+  return variants.value[selectedVariant.value].quantity > 0
+})
 
-  </script>
+const addToCart = () => cart.value += 1
+
+const updateVariant = (index) => {
+  selectedVariant.value = index
+}
+
+createEls({details}, app)
+
+updateIf({inStock}, app)
+updateCurly({product, brand}, app)
+updateBinds({image, inStock}, app)
+addEvent('click', { addToCart }, app);
+
+</script>
 </body>
 </html>
