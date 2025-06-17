@@ -4,24 +4,22 @@ export function ref(initialValue) {
   let _value = initialValue;
   const subscribers = new Set();
 
-  function notify() {
-    subscribers.forEach(cb => cb(_value));
-  }
-
   return {
-    get value() { return _value; },
-    set value(newVal) {
-      _value = newVal;
-      notify();
+    get value() {
+      return _value;
     },
-    subscribe(cb) {
-      subscribers.add(cb);
-      // Optionally return unsubscribe function:
-      return () => subscribers.delete(cb);
-    }
-  }
+    set value(newVal) {
+      if (_value !== newVal) {
+        _value = newVal;
+        subscribers.forEach((fn) => fn(_value));
+      }
+    },
+    subscribe(fn) {
+      subscribers.add(fn);
+      return () => subscribers.delete(fn);
+    },
+  };
 }
-
 
 // Process {{ variable }} interpolations inside root node
 export function processInterpolations(refs, root) {
@@ -152,87 +150,6 @@ export function processConditionals(refs, root) {
       }
     }
   });
-}
-
-export function processFor(refs, root) {
-  if (!(root instanceof Node)) throw new TypeError("root must be a Node");
-
-  const els = root.querySelectorAll('[v-for]');
-
-  els.forEach(el => {
-    const expr = el.getAttribute('v-for').trim(); // e.g. "detail in details"
-    const match = expr.match(/^(\w+)\s+in\s+(\w+)$/);
-    if (!match) {
-      console.warn(`Invalid v-for expression: ${expr}`);
-      return;
-    }
-    const [_, itemName, listName] = match;
-    const listRef = refs[listName];
-    if (!listRef || !Array.isArray(listRef.value)) {
-      console.warn(`v-for list ${listName} is not an array`);
-      return;
-    }
-
-    const parent = el.parentNode;
-    const placeholder = document.createComment(`v-for placeholder for ${expr}`);
-    parent.insertBefore(placeholder, el);
-    parent.removeChild(el);
-
-    // Function to render list based on current value
-    function renderList(arr) {
-      // Remove previous rendered nodes after placeholder
-      let next;
-      while ((next = placeholder.nextSibling) && !next.isSameNode(parent.lastChild)) {
-        if (next._vfor) parent.removeChild(next);
-        else break;
-      }
-
-      // Remove any nodes marked _vfor
-      let node = placeholder.nextSibling;
-      while (node && node._vfor) {
-        const toRemove = node;
-        node = node.nextSibling;
-        parent.removeChild(toRemove);
-      }
-
-      // Render new nodes
-      arr.forEach(item => {
-        const clone = el.cloneNode(true);
-        clone.removeAttribute('v-for');
-        clone._vfor = true; // mark node for cleanup
-
-        // Replace text nodes with interpolation {{ itemName }} or {{ itemName.prop }}
-        replaceInterpolationsInNode(clone, itemName, item);
-
-        parent.insertBefore(clone, placeholder.nextSibling);
-      });
-    }
-
-    // Initial render
-    renderList(listRef.value);
-
-    // Subscribe to reactive changes
-    if (typeof listRef.subscribe === 'function') {
-      listRef.subscribe(renderList);
-    }
-  });
-}
-
-function replaceInterpolationsInNode(node, itemName, item) {
-  // If it's a text node, replace interpolation text
-  if (node.nodeType === Node.TEXT_NODE) {
-    node.textContent = node.textContent.replace(/\{\{\s*(.+?)\s*\}\}/g, (match, p1) => {
-      if (p1 === itemName) return item;
-      if (p1.startsWith(itemName + '.')) {
-        const prop = p1.slice(itemName.length + 1);
-        return item[prop] ?? '';
-      }
-      return match;
-    });
-  } else if (node.nodeType === Node.ELEMENT_NODE) {
-    // Otherwise, recurse on child nodes
-    node.childNodes.forEach(child => replaceInterpolationsInNode(child, itemName, item));
-  }
 }
 
 

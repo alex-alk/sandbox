@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Index</title>
+  <link href="assets/main.css" rel="stylesheet">
+  <script src="main.js" defer type="module"></script>
+</head>
+<body>
+  <div id="app">
+    
+  </div>
+
+  <script type="module">
+    import {  getState, computed, ref, updateText, updateTexts, updateBinds, createEls, addEvent } from './main.js'
+    import ProductDisplay from './components/ProductDisplay.js'
+
+    const content = 
+  `
+  <div class="nav-bar"></div>
+  <div class="cart" v-text="cart"></div>
+  <div v-component="productDisplay" v-on:add-to-cart="updateCart"></div>
+  `
+const app = document.getElementById('app');
+app.innerHTML = content
+
+
+    const templates = document.querySelectorAll('[v-component=productDisplay]');
+    // console.log(templates)
+    // console.log(template)
+
+    const premium = false
+
+
+
+    for (const template of templates) {
+      template.append(ProductDisplay(premium));
+    }
+
+    const cart = ref(0)
+    const cartItems = []
+    
+    const data = {
+      cart
+    }
+    updateText({cart})
+
+    const updateCart = function (id) {
+      cartItems.push(id);
+      cart.value = cartItems.length
+    }
+
+    const methods = {
+      updateCart
+    }
+    addEvent('add-to-cart', methods)
+
+  </script>
+</body>
+</html>

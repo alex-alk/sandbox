@@ -1,71 +1,100 @@
-import { reactive, bindReactive,  defineEmits, getState, computed, ref, updateText, updateTexts, updateBinds, createEls, addEvent } from "../main.js";
+import {
+  defineEmits,
+  getState,
+  ref,
+  watchEffect,
+  addEvent
+} from "../main.js";
 
 export default function ReviewForm() {
+  const templ = `
+    <form class="review-form" v-on:submit="onSubmit">
+      <h3>Leave a review</h3>
 
-const templ = `
-  <form class="review-form" v-on:submit="onSubmit">
-    <h3>Leave a review</h3>
-    <label for="name">Name:</label>
-    <input id="name" v-model="review.name">
+      <label for="name">Name:</label>
+      <input id="name" name="name">
 
-    <label for="review">Review:</label>      
-    <textarea id="review" v-model="review.content"></textarea>
+      <label for="review">Review:</label>      
+      <textarea id="review" name="content"></textarea>
 
-    <label for="rating">Rating:</label>
-    <select id="rating" v-model.number="review.rating">
-      <option>5</option>
-      <option>4</option>
-      <option>3</option>
-      <option>2</option>
-      <option>1</option>
-    </select>
+      <label for="rating">Rating:</label>
+      <select id="rating" name="rating">
+        <option value="">Select</option>
+        <option>5</option>
+        <option>4</option>
+        <option>3</option>
+        <option>2</option>
+        <option>1</option>
+      </select>
 
-    <input class="button" type="submit" value="Submit">
-  </form>`
+      <input class="button" type="submit" value="Submit">
+    </form>`;
 
-const templateEl = document.createElement('template');
-templateEl.innerHTML = templ.trim(); // trim() avoids stray whitespace
-const component = templateEl.content
+  const templateEl = document.createElement('template');
+  templateEl.innerHTML = templ.trim();
+  const component = templateEl.content;
+  const root = component.firstElementChild;
 
-const review = reactive({
-  name: '',
-  content: '',
-  rating: null
-})
+  // Reactive state
+  const review = getState({
+    name: ref(''),
+    content: ref(''),
+    rating: ref(null)
+  });
 
-bindReactive(review, component)
+  // Emit setup
+  const emit = defineEmits(['review-submitted'], root);
 
-const root = component.firstElementChild;
-const emit = defineEmits([
-    'review-submitted'
-], root)
+  // Form submit
+  function onSubmit(e) {
+    e.preventDefault();
 
-const onSubmit = function(e) {
-    e.preventDefault()
-
-    if (review.name === '' || review.content === '' || review.rating === null) {
-      alert('aaaaaaaaaa')
-      return
+    if (!review.name || !review.content || !review.rating) {
+      alert('Please fill out all fields.');
+      return;
     }
 
     const productReview = {
-        name: review.name,
-        content: review.content,
-        rating: review.rating
-    }
-    emit('review-submitted', productReview)
+      name: review.name,
+      content: review.content,
+      rating: review.rating
+    };
 
-    review.name = ''
-    review.content = ''
-    review.rating = null
-}
+    emit('review-submitted', productReview);
 
-const methods = {
-    onSubmit
-}
+    // Reset fields
+    review.name = '';
+    review.content = '';
+    review.rating = null;
+  }
 
-addEvent('submit', methods, component)
+  const methods = { onSubmit };
+  addEvent('submit', methods, component);
 
-return component;
+  // Bind inputs manually (v-model behavior)
+  const nameInput = component.querySelector('#name');
+  const contentInput = component.querySelector('#review');
+  const ratingInput = component.querySelector('#rating');
 
+  // Input listeners to update state
+  nameInput.addEventListener('input', e => {
+    review.name = e.target.value;
+  });
+
+  contentInput.addEventListener('input', e => {
+    review.content = e.target.value;
+  });
+
+  ratingInput.addEventListener('change', e => {
+    review.rating = Number(e.target.value);
+  });
+
+  // Watch state and update DOM inputs (in case state changes programmatically)
+  watchEffect(() => {
+    if (nameInput.value !== review.name) nameInput.value = review.name;
+    if (contentInput.value !== review.content) contentInput.value = review.content;
+    if (ratingInput.value !== String(review.rating)) ratingInput.value = review.rating || '';
+  });
+
+  return component;
 }

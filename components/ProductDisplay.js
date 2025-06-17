@@ -1,171 +1,157 @@
-import { defineEmits, getState, computed, ref, updateText, updateTexts, updateBinds, createEls, addEvent, updateIf } from "../main.js";
-    import ReviewForm from './ReviewForm.js'
-    import ReviewList from './ReviewList.js'
+import { defineEmits, getState, computed, ref, updateText, updateTexts, updateBinds, createEls, addEvent, updateIf, watchEffect } from "../main.js";
+import ReviewForm from './ReviewForm.js';
+import ReviewList from './ReviewList.js';
 
 export default function ProductDisplay(premium) {
-
-const templ = `
-<div class="product-display">
+  const templ = `
+  <div class="product-display">
     <div class="product-container">
-        <div class="product-image">    
-            <img v-bind:src="image">
-        </div>
-        <div class="product-info">
-            <h1 v-text="product"></h1>
-            <p v-text="stock"></p>
-            <p v-text="shipping"></p>
-            <ul>
-                <li class="a" v-for="details"></li>
-            </ul>
-            
-            <div 
-                v-for="(variant, index) in variants" 
-                :key="variant.id"
-                @mouseover="updateVariant(index)"
-                class="color-circle"
-                :style="{ backgroundColor: variant.color }"
-            >
-
-            <button
-                class="button" 
-                :class="{ disabledButton: !inStock }"
-                :disabled="!inStock"
-                v-on:click="addToCart"
-            >Add to cart</button>
-        </div>
+      <div class="product-image">    
+        <img v-bind:src="image">
+      </div>
+      <div class="product-info">
+        <h1 v-text="product"></h1>
+        <p v-text="stock"></p>
+        <p v-text="shipping"></p>
+        <ul>
+          <li v-for="details"></li>
+        </ul>
+        <div 
+          v-for="(variant, index) in variants" 
+          :key="variant.id"
+          @mouseover="updateVariant"
+          class="color-circle"
+          :style="{ backgroundColor: variant.color }"
+          elid="{{index}}"
+        ></div>
+        <button
+          class="button" 
+          :class="{ disabledButton: !inStock }"
+          :disabled="!inStock"
+          v-on:click="addToCart"
+        >Add to cart</button>
+      </div>
     </div>
     <div v-if="reviews.length > 0" v-component="reviewList"></div>
     <div v-component="reviewForm" v-on:review-submitted="addReview"></div>
-</div>`
+  </div>`;
 
-const templateEl = document.createElement('template');
-templateEl.innerHTML = templ.trim(); // trim() avoids stray whitespace
-const productDisplay = templateEl.content
+  const templateEl = document.createElement('template');
+  templateEl.innerHTML = templ.trim();
+  const productDisplay = templateEl.content;
 
-const reviews = ref([
+  // Reviews ref
+  const reviews = ref([]);
 
-])
+  updateIf({reviews}, productDisplay);
 
-updateIf({reviews}, productDisplay)
+  // Append review components
+  productDisplay.querySelectorAll('[v-component=reviewForm]').forEach(el => el.append(ReviewForm()));
+  productDisplay.querySelectorAll('[v-component=reviewList]').forEach(el => el.append(ReviewList(reviews)));
 
+  const addReview = (review) => {
+    reviews.value.push(review);
+  };
 
-const templates = productDisplay.querySelectorAll('[v-component=reviewForm]');
-for (const template of templates) {
-    template.append(ReviewForm());
-}
-const templatesf = productDisplay.querySelectorAll('[v-component=reviewList]');
-for (const template of templatesf) {
-    template.append(ReviewList(reviews));
-    
-}
+  const details = ['50% cotton', '30% wool', '20% polyester'];
+  const variants = [
+    { id: 2234, color: 'green', image: './assets/images/socks_green.jpeg', quantity: 50 },
+    { id: 2235, color: 'blue', image: './assets/images/socks_blue.jpeg', quantity: 0 },
+  ];
 
-const addReview = (review) => {
-    console.log('addReview is called')
-    reviews.value.push(review)
-    console.log(review)
-}
+  let selectedVariant = ref(0);
 
+  const product = 'Socks';
+  const band = 'Vue Mastery';
 
-const details = ['50% cotton', '30% wool', '20% polyester']
-const variants = [
-    { id: 2234, color: 'green' , image: './assets/images/socks_green.jpeg', quantity: 50},
-    { id: 2235, color: 'blue' , image: './assets/images/socks_blue.jpeg', quantity: 0},
-]
+  const data = {
+    product: product + ' ' + band,
+    cart: ref(0),
+    selectedVariant,
+    variants,
+    premium
+  };
 
-function updateStyleFromArray(obj, value, template) {
+  // Computed properties
+  const shipping = computed(() => premium ? 'Shipping: Free' : 'Shipping: 2.99');
+  const image = computed(() => variants[selectedVariant.value].image);
+  const inStock = computed(() => variants[selectedVariant.value].quantity > 0);
+  const stock = computed(() => inStock.value ? 'In Stock' : 'Out of Stock');
 
-let component = template ?? document;
+  data.shipping = shipping;
+  data.image = image;
+  data.inStock = inStock;
+  data.stock = stock;
+  data.reviews = reviews;
+  data.details = details;
 
-      const parameterName = Object.keys(obj)[0];  // "product"
-      const text = obj[parameterName];            // "product"
-      const els = component.querySelectorAll(`[style-${parameterName}]`);
+  const state = getState(data);
 
-      for (const el of els) {
-          const id = el.getAttribute('elid')
-          const variant = variants[id]
-          const attr = el.getAttribute(`style-${parameterName}`);
-
-        console.log(variants, id, value, el)
-        el.style[attr] = variant[value]
-      }
-      
+  // Update variant handler — note: event target has elid attribute set to index
+  function updateVariant(event) {
+    const index = event.target.getAttribute('elid');
+    if (index !== null) {
+      selectedVariant.value = Number(index);
     }
+  }
 
-   const product = 'Socks'
-   const band = 'Vue Mastery'
-       let selectedVariant = 0;
+  // Emits setup
+  const root = productDisplay.firstElementChild;
+  const emit = defineEmits(['add-to-cart'], root);
 
-const data = {
-      product: product + ' ' + band,
-      
-      cart: ref(0),
-      
-      selectedVariant,
-      //image,
-      variants,
-      premium
-}
+  function addToCart() {
+    if (inStock.value) {
+      emit('add-to-cart', variants[selectedVariant.value].id);
+    }
+  }
 
-const state = getState(data)
+  // Setup bindings and events with reactive updates
 
-const shipping = computed(() => state.premium ? 'Shipping: Free' : 'Shipping: 2.99' )
-updateText({shipping}, productDisplay)
+  // Text bindings update reactively
+  updateTexts({
+    product: state.product,
+    stock: state.stock,
+    shipping: state.shipping
+  }, productDisplay);
 
-const image = computed(() => state.variants[state.selectedVariant].image);
+  // Bind image src reactively
+  updateBinds({ image: state.image }, productDisplay);
 
-const notInStock = computed(() => {
-return state.variants[state.selectedVariant].quantity > 0
-})
+  // Create detail list items
+  createEls({ details }, productDisplay);
 
-const stock = computed(() => state.variants[state.selectedVariant].quantity > 0 ? 'In Stock' : 'Out of Stock');
+  // Create variant circles
+  // Because v-for here is an element, we replace manually:
+  const variantContainers = productDisplay.querySelectorAll('[v-for="variants"]');
+  variantContainers.forEach(container => {
+    container.innerHTML = '';
+    variants.forEach((variant, index) => {
+      const div = document.createElement('div');
+      div.className = 'color-circle';
+      div.style.backgroundColor = variant.color;
+      div.setAttribute('elid', index);
+      div.addEventListener('mouseover', updateVariant);
+      container.appendChild(div);
+    });
+  });
 
-const inStock = computed(() => {
-  return state.variants[state.selectedVariant].quantity > 0
-})
+  // Update stock-related UI reactively with watchEffect
+  watchEffect(() => {
+    // Button enabled/disabled
+    const button = productDisplay.querySelector('.button');
+    if (!button) return;
+    if (inStock.value) {
+      button.disabled = false;
+      button.classList.remove('disabledButton');
+    } else {
+      button.disabled = true;
+      button.classList.add('disabledButton');
+    }
+  });
 
-updateTexts(data, productDisplay)
+  // Add event listeners
+  addEvent('click', { addToCart }, productDisplay);
+  addEvent('review-submitted', { addReview }, productDisplay);
 
-
-const updateVariant = function(e) {
-    const id = e.target.getAttribute('elid')
-    // const obj = variants.find(v => v.id == id)
-    // updateSrc({image: obj.image})
-    state.selectedVariant = id;
-
-}
-const root = productDisplay.firstElementChild;
-const emit = defineEmits(['add-to-cart'], root)
-
-const addToCart = function () {
-    emit('add-to-cart', state.variants[state.selectedVariant].id)
-}
-
-
-const methods = {
-  updateVariant,
-  addToCart,
-  addReview
-}
-
-  data.notInStock = notInStock;
-  data.stock = stock
-  data.inStock = inStock
-  data.image = image
-
-
-    
-//updateBinds({image}, productDisplay)
-updateBinds(data, productDisplay)
-// updateBinds('disabled', data, productDisplay)
-
-
-createEls({details}, productDisplay);
-createEls({variants}, productDisplay)
-//updateStyleFromArray({variants}, 'color', productDisplay)
-addEvent('click', methods, productDisplay)
-addEvent('mouseover', methods, productDisplay)
-addEvent('review-submitted', methods, productDisplay)
-
-return productDisplay;
-
+  return productDisplay;
 }
