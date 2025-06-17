@@ -1,3 +1,77 @@
+export function setTexts(obj, component) {
+    const texts = component.querySelectorAll('[f-text]');
+
+    for (const el of texts) {
+        const attributeValue = el.getAttribute('f-text');
+        el.textContent =  obj[attributeValue]
+    }
+}
+
+export function setText(obj, component) {
+    const firstKey = Object.keys(obj)[0]
+    const texts = component.querySelectorAll(`[f-text="${firstKey}"]`);
+
+    for (const el of texts) {
+        el.textContent = obj[firstKey]
+    }
+    
+}
+
+export function setBind(type, obj, component) {
+
+    const texts = component.querySelectorAll(`[f-bind\\:${type}]`);
+
+    for (const el of texts) {
+        const attributeValue = el.getAttribute(`f-bind:${type}`);
+        el[type] =  obj[attributeValue]
+    }
+}
+
+export function setEvent(type, obj, component) {
+
+    const texts = component.querySelectorAll(`[f-on\\:${type}]`);
+
+    for (const el of texts) {
+        const attributeValue = el.getAttribute(`f-on:${type}`);
+        el.addEventListener(type, obj[attributeValue])
+    }
+}
+
+export function setFor(obj, component) {
+
+    const texts = component.querySelectorAll('[f-for]')
+
+    for (const el of texts) {
+        const attributeValue = el.getAttribute('f-for')
+        const constituents = attributeValue.split('::')
+
+        const parent = el.parentElement
+        const original = el.cloneNode(true)
+        el.remove()
+
+        const array =  obj[constituents[0]]
+        
+        for (const arrEl of array) {
+            const clone = original.cloneNode(true)
+            if (constituents.length === 1) {
+                clone.textContent = arrEl
+            } else if (constituents.length === 2) {
+                clone.textContent = arrEl[constituents[1]]
+                if (arrEl['id']) {
+                    clone.setAttribute('elid', arrEl['id'])
+                }
+            }
+            
+            parent.appendChild(clone);
+        }
+    }
+}
+
+
+
+
+
+
 // Step 2: Computed system
 const computedDeps = [];
 
