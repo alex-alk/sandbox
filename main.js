@@ -1,30 +1,33 @@
 const bindings = {};
 
 export function init(component) {
-    const all = component.querySelectorAll('[v-text], [v-bind\\:src], [v-if]');
+    const all = component.querySelectorAll('[v-text], [v-bind\\:src], [v-if], [v-for]');
 
     for (const el of all) {
         const directives = [
             { attr: 'v-text', key: el.getAttribute('v-text') },
             { attr: 'v-bind:src', key: el.getAttribute('v-bind:src') },
-            { attr: 'v-if', key: el.getAttribute('v-if') }
+            { attr: 'v-if', key: el.getAttribute('v-if') },
+            { attr: 'v-for', key: el.getAttribute('v-for') }
         ];
 
         for (const { attr, key } of directives) {
             if (!key) {
                 continue
             }
+            // some keys may contain ::
+            const keyy = key.split('::')[0]
 
             // init
-            if (!bindings[key]) {
-                bindings[key] = {}
+            if (!bindings[keyy]) {
+                bindings[keyy] = {}
             }
-            if (!bindings[key][attr]) {
-                bindings[key][attr] = []
+            if (!bindings[keyy][attr]) {
+                bindings[keyy][attr] = []
             }
 
             // add binding
-            bindings[key][attr].push(el);
+            bindings[keyy][attr].push(el);
         }
     }
 
@@ -71,6 +74,29 @@ export const state = new Proxy({},
 
             if (bindings[variableName]['v-for']) {
                 for (const el of bindings[variableName]['v-for']) {
+                    const elid = el.getAttribute('elid');
+
+                    const attribute = el.getAttribute('v-for');
+                    const array = attribute.split('::')
+                    const size = array.length
+
+                    if (!elid) {
+                        // value will be data array
+                        for (const valueText of value) {
+                            const clone = el.cloneNode(true)
+
+                            if (size === 1){
+                                clone.textContent = valueText
+                            }
+                            if (size === 2){
+                                clone.textContent = valueText[array[size - 1]]
+                            }
+                            el.after(clone);
+                        }
+                        el.remove()
+                    } else {
+
+                    }
                     // ia elementul
                     // daca nu are elid
                     // genereaza
