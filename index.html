@@ -33,7 +33,10 @@ const content = `
             v-on:mouseover="updateImage"
         >
         </div>
-        <button class="button" v-on:click="addToCart">Add to cart</button>
+        <button 
+            class="button" 
+            v-bind:class="disabledClass"
+            v-on:click="addToCart">Add to cart</button>
       </div>
     </div>
   </div>`
@@ -59,6 +62,7 @@ const image = ref('image', './assets/images/socks_green.jpeg')
 const product = ref('product', 'Socks')
 
 const inStock = ref('inStock', false)
+
 const details = ref('details', ['50% cotton', '30% wool', '20% polyester'])
 const variants = ref('variants', [
   { id: 2234, color: 'green', image: socksGreenImage },
