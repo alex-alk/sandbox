@@ -40,15 +40,18 @@ const content = `
 
 const app = document.getElementById('app');
 app.innerHTML = content.trim()
-init(app)
+//init(app) // set array with variable name => elements
 
 let cartItems = 0
 const cart = ref('cart', `Cart(${cartItems})`)
 
 const addToCart = ref('addToCart', function() {
+    console.log('add to cart', `Cart(${cartItems})`)
     cartItems++
     cart.value = `Cart(${cartItems})`
 })
+const socksGreenImage = './assets/images/socks_green.jpeg';
+const socksBlueImage = './assets/images/socks_blue.jpeg';
 
 const image = ref('image', './assets/images/socks_green.jpeg')
 
@@ -57,17 +60,18 @@ const product = ref('product', 'Socks')
 
 const inStock = ref('inStock', false)
 const details = ref('details', ['50% cotton', '30% wool', '20% polyester'])
-const variants = ref('variants',[
-    { id: 2234, color: 'green' },
-    { id: 2235, color: 'blue' },
+const variants = ref('variants', [
+  { id: 2234, color: 'green', image: socksGreenImage },
+  { id: 2235, color: 'blue', image: socksBlueImage },
 ])
 
 const updateImage = ref('updateImage', function(e) {
-    console.log('aaaa')
     const el = e.target
-    const id = el.getAttribute('ellid')
+    const id = el.getAttribute('elid')
+    image.value = variants.value[id].image
 })
 
+init(app)
 </script>
 </body>
 </html>
