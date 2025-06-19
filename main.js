@@ -1,4 +1,5 @@
 const bindings = {}
+const computedDefs = {}
 
 function evaluateStyleBinding(binding, context, alias) {
   try {
@@ -20,8 +21,12 @@ export const state = new Proxy({}, {
   set(target, variableName, value) {
     target[variableName] = value
 
+
+
+
     const binding = bindings[variableName]
     if (binding) {
+      // Handle v-for cloning
       const forList = binding['v-for']
       if (forList) {
         for (const el of forList) {
@@ -33,7 +38,6 @@ export const state = new Proxy({}, {
           } else {
             arrayName = key.trim()
           }
-
           const list = value
           if (!elid && Array.isArray(list)) {
             let refNode = el
@@ -41,7 +45,7 @@ export const state = new Proxy({}, {
               const clone = el.cloneNode(true)
               clone.setAttribute('elid', i)
 
-              // style binding
+              // Apply style
               const styleBinding = clone.getAttribute('v-bind:style')
               if (styleBinding && alias) {
                 clone.setAttribute(
@@ -52,7 +56,7 @@ export const state = new Proxy({}, {
                 clone.textContent = item
               }
 
-              // event bindings
+              // Bind events
               for (const attr of clone.attributes) {
                 if (attr.name.startsWith('v-on:')) {
                   const [_, eventName] = attr.name.split(':')
@@ -62,7 +66,6 @@ export const state = new Proxy({}, {
                   }
                 }
               }
-
               refNode.parentNode.insertBefore(clone, refNode.nextSibling)
               refNode = clone
             })
@@ -71,7 +74,7 @@ export const state = new Proxy({}, {
         }
       }
 
-      // Other directives...
+      // Handle other directives
       if (binding['v-text']) {
         binding['v-text'].forEach(el => {
           el.textContent = state[el.getAttribute('v-text')]
@@ -82,11 +85,26 @@ export const state = new Proxy({}, {
           el.src = state[el.getAttribute('v-bind:src')]
         })
       }
+
+      
       if (binding['v-bind:class']) {
-        binding['v-bind:class'].forEach(el => {
-          el.classList.add(state[el.getAttribute('v-bind:class')])
-        })
-      }
+  binding['v-bind:class'].forEach(el => {
+    const key = el.getAttribute('v-bind:class')
+    const prevClass = el._prevClass || ''
+    const newClass = state[key]
+
+    if (prevClass && el.classList.contains(prevClass)) {
+      el.classList.remove(prevClass)
+    }
+
+    if (newClass) {
+      el.classList.add(newClass)
+      el._prevClass = newClass
+    } else {
+      el._prevClass = ''
+    }
+  })
+}
       if (binding['v-bind:disabled']) {
         binding['v-bind:disabled'].forEach(el => {
           el.disabled = state[el.getAttribute('v-bind:disabled')]
@@ -110,10 +128,21 @@ export const state = new Proxy({}, {
       }
     }
 
+    // Recompute computed properties (skip if setting a computed)
+    if (!computedDefs[variableName]) {
+      for (const [cName, getter] of Object.entries(computedDefs)) {
+        const newVal = getter()
+        if (state[cName] !== newVal) {
+          state[cName] = newVal
+        }
+      }
+    }
+
     return true
   }
 })
 
+// Define reactive reference
 export function ref(variableName, value) {
   state[variableName] = value
   return {
@@ -126,13 +155,21 @@ export function ref(variableName, value) {
   }
 }
 
+// Define computed property
+export function computed(name, getter) {
+  computedDefs[name] = getter
+  // Initialize computed value
+  state[name] = getter()
+  return () => state[name]
+}
+
+// Initialize bindings
 export function init(component) {
   const all = component.querySelectorAll(
     '[v-text], [v-bind\\:src], [v-if], [v-for], ' +
     '[v-on\\:click], [v-on\\:mouseover], ' +
     '[v-bind\\:class], [v-bind\\:disabled], [v-bind\\:style]'
   )
-
   all.forEach(el => {
     const directives = [
       { attr: 'v-text', key: el.getAttribute('v-text') },
@@ -166,7 +203,11 @@ export function init(component) {
       const value = state[arrayName]
       if (attr === 'v-text') el.textContent = value
       if (attr === 'v-bind:src') el.src = value
-      if (attr === 'v-bind:class' && value) el.classList.add(value)
+      if (attr === 'v-bind:class' && value) {
+
+        el.classList.add(value)
+
+      }
       if (attr === 'v-bind:disabled') el.disabled = value
       if (attr === 'v-if') {
         el.style.display = value ? '' : 'none'

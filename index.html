@@ -15,7 +15,7 @@
   </div>
 
 <script type="module">
-import { ref, init } from './main.js'
+import { ref, init, computed } from './main.js'
 
 const content = `
 <div class="nav-bar"></div>
@@ -51,6 +51,7 @@ const app = document.getElementById('app');
 app.innerHTML = content.trim()
 //init(app) // set array with variable name => elements
 
+// todo: bindingurile trebuie sa aibe doar elementele prezente in componenta
 let cartItems = 0
 const cart = ref('cart', `Cart(${cartItems})`)
 
@@ -70,16 +71,16 @@ const variants = ref('variants', [
   { id: 2235, color: 'blue', image: socksBlueImage , quantity: 0},
 ])
 
-const inStock = ref('inStock', variants.value[selectedVariant.value].quantity > 0)
+const selectedVariant = ref('selectedVariant', 0)
 
-const notInStock = ref('notInStock', !inStock.value)
-const divStyle = ref('divStyle', )
+const image = computed('image', () => variants.value[selectedVariant.value].image)
+const inStock = computed('inStock', () => variants.value[selectedVariant.value].quantity > 0)
 
-const disabledClass = ref('disabledClass', inStock.value ? '' : 'disabledButton')
+const notInStock = computed('notInStock', () => !variants.value[selectedVariant.value].quantity > 0)
+
+const disabledClass = computed('disabledClass', () => variants.value[selectedVariant.value].quantity > 0 ? '' : 'disabledButton')
 
 const details = ref('details', ['50% cotton', '30% wool', '20% polyester'])
-
-const selectedVariant = ref(0)
 
 const updateVariant = ref('updateVariant', function(e) {
     const el = e.target
@@ -87,8 +88,6 @@ const updateVariant = ref('updateVariant', function(e) {
     selectedVariant.value = id
     //image.value = variants.value[id].image
 })
-
-const image = ref('image', variants.value[selectedVariant.value].image)
 
 
 init(app)
