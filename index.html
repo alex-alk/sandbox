@@ -9,6 +9,9 @@
 </head>
 <body>
   <div id="app">
+    <template>
+      
+    </template>
   </div>
 
 <script type="module">
@@ -29,12 +32,15 @@ const content = `
         <ul>
           <li v-for="details"></li>
         </ul>
-        <div v-for="variants::color" 
-            v-on:mouseover="updateImage"
+        <div v-for="variant in variants" 
+            v-on:mouseover="updateVariant"
+            class="color-circle"
+            v-bind:style="{ backgroundColor: variant.color }"
         >
         </div>
         <button 
-            class="button" 
+            class="button"
+            v-bind:disabled="notInStock"
             v-bind:class="disabledClass"
             v-on:click="addToCart">Add to cart</button>
       </div>
@@ -56,24 +62,34 @@ const addToCart = ref('addToCart', function() {
 const socksGreenImage = './assets/images/socks_green.jpeg';
 const socksBlueImage = './assets/images/socks_blue.jpeg';
 
-const image = ref('image', './assets/images/socks_green.jpeg')
-
 // add to state
 const product = ref('product', 'Socks')
 
-const inStock = ref('inStock', false)
-
-const details = ref('details', ['50% cotton', '30% wool', '20% polyester'])
 const variants = ref('variants', [
-  { id: 2234, color: 'green', image: socksGreenImage },
-  { id: 2235, color: 'blue', image: socksBlueImage },
+  { id: 2234, color: 'green', image: socksGreenImage , quantity: 50},
+  { id: 2235, color: 'blue', image: socksBlueImage , quantity: 0},
 ])
 
-const updateImage = ref('updateImage', function(e) {
+const inStock = ref('inStock', variants.value[selectedVariant.value].quantity > 0)
+
+const notInStock = ref('notInStock', !inStock.value)
+const divStyle = ref('divStyle', )
+
+const disabledClass = ref('disabledClass', inStock.value ? '' : 'disabledButton')
+
+const details = ref('details', ['50% cotton', '30% wool', '20% polyester'])
+
+const selectedVariant = ref(0)
+
+const updateVariant = ref('updateVariant', function(e) {
     const el = e.target
     const id = el.getAttribute('elid')
-    image.value = variants.value[id].image
+    selectedVariant.value = id
+    //image.value = variants.value[id].image
 })
+
+const image = ref('image', variants.value[selectedVariant.value].image)
+
 
 init(app)
 </script>
