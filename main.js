@@ -316,68 +316,84 @@ function updateElement(el, directive, value, data) {
         }
     }
     if (directive === 'v-for') {
-        // keep the original element in memory
-        // find interpolation in element
+    const attribute = el.getAttribute('v-for');
+    // Parse "item in items" or "(item, index) in items"
+    const [left, right] = attribute.split(' in ').map(s => s.trim());
+    
+    // Extract variable names (could be "item" or "(item, index)")
+    let itemVar = left;
+    let indexVar = null;
+    const match = left.match(/^\(\s*([^,\s]+)\s*,\s*([^,\s]+)\s*\)$/);
+    if (match) {
+        itemVar = match[1];
+        indexVar = match[2];
+    }
+    
+    if (!Array.isArray(value)) {
+        console.warn('v-for expects an array value');
+        return;
+    }
 
-        const attribute = el.getAttribute('v-for');
-        const constituentsRaw = attribute.split(' in ')
-        const constituents = constituentsRaw.map(cr => cr.trim())
-        let variableName = constituents[0];
+    // Remove old rendered items except the template element
+    let nextSibling = el.nextElementSibling;
+    while (nextSibling && nextSibling.hasAttribute('data-v-for-item')) {
+        const toRemove = nextSibling;
+        nextSibling = nextSibling.nextElementSibling;
+        toRemove.remove();
+    }
 
-        const match = variableName.match(/\(\s*([^,\s]+)\s*,/);
+    // Save original template if not saved yet
+    if (!el.dataset.template) {
+        el.dataset.template = el.innerHTML;
+    }
 
-        if (match) {
-            const word = match[1]; // "variant"
-            variableName = word
-        }
+    // Render new elements from array
+    value.forEach((item, index) => {
+        const newEl = el.cloneNode(true);
+        newEl.removeAttribute('v-for');
+        newEl.setAttribute('data-v-for-item', ''); // mark it for removal next time
 
-        value = value.reverse()
-        for (const arrayEl in value) {
+        // Build context for interpolation and event handlers
+        const context = {};
+        context[itemVar] = item;
+        if (indexVar) context[indexVar] = index;
 
-            const newElement = el.cloneNode(true)
-            
-            const context = {}
-            context[variableName] = value[arrayEl]
-   
-            if (!el.dataset.template) {
-                el.dataset.template = el.textContent; // Save original with {{ }}
-            }
-
-            const onMouseover = el.getAttribute('v-on:mouseover')
-            if (onMouseover) {
-                // evaluate the expression using context and data
-                const expression = el.getAttribute('v-on:mouseover');
-
-                const fnMatch = expression.match(/^(\w+)\(([\w.]+)\)$/);
-                if (fnMatch) {
-                    const fnName = fnMatch[1]; // e.g., updateImage
-                    const argPath = fnMatch[2]; // e.g., variant.image
-                    const fn = data[fnName];
-
-                    let contextValue = arrayEl
-                    if (argPath !== 'index') {
-                        contextValue = getPropByPath(context, argPath);
-                    } 
-
-                    if (typeof fn === 'function') {
-                        newElement.addEventListener('mouseover', () => fn(contextValue));
-                    }
+        // Handle v-on:mouseover inside v-for (optional enhancement)
+        const onMouseover = newEl.getAttribute('v-on:mouseover');
+        if (onMouseover) {
+            const fnMatch = onMouseover.match(/^(\w+)\(([\w.]+)\)$/);
+            if (fnMatch) {
+                const fnName = fnMatch[1];
+                const argPath = fnMatch[2];
+                const fn = data[fnName];
+                let argValue = argPath === indexVar ? index : getPropByPath(context, argPath);
+                if (typeof fn === 'function') {
+                    newEl.addEventListener('mouseover', () => fn(argValue));
                 }
             }
-            const styleBinding = el.getAttribute('v-bind:style');
-            if (styleBinding) {
-                // Very basic parser for { backgroundColor: variant.color }
-                const styleObject = new Function('with(this) { return ' + styleBinding + '; }').call(context);
-                updateElement(newElement, 'v-bind:style', styleObject, data);
-            }
-
-        
-            const replacedText = interpolate(el.dataset.template, context)
-
-            newElement.textContent = replacedText
-            el.insertAdjacentElement('afterend', newElement)
         }
-    }
+
+        // Handle v-bind:style inside v-for
+        const styleBinding = newEl.getAttribute('v-bind:style');
+        if (styleBinding) {
+            const styleObject = new Function('with(this) { return ' + styleBinding + '; }').call(context);
+            updateElement(newEl, 'v-bind:style', styleObject, data);
+        }
+
+        // Replace interpolations {{ }} inside the element
+        // Set innerHTML to template first (clone content)
+newEl.innerHTML = newEl.dataset.template;
+
+// Then recursively interpolate all {{ }} in text nodes using full JS eval in context
+interpolateMustache(newEl, context);
+
+        el.insertAdjacentElement('afterend', newEl);
+    });
+
+    // Optionally hide the original template element itself
+    el.style.display = 'none';
+}
+
 
     if (directive === 'v-model') {
     const modelAttr = el.getAttribute(directive);
@@ -511,6 +527,25 @@ function updateElement(el, directive, value, data) {
         });
     }
 }
+
+function interpolateMustache(node, scope) {
+  if (node.nodeType === Node.TEXT_NODE) {
+    const mustacheRE = /{{\s*(.+?)\s*}}/g
+    node.textContent = node.textContent.replace(mustacheRE, (_, expr) => {
+      try {
+        // Create a function with the expression and evaluate it in scope
+        // Use `with` for scope context (simplified example)
+        return new Function('with(this) { return ' + expr + ' }').call(scope)
+      } catch (e) {
+        console.error('Failed to evaluate mustache expression:', expr, e)
+        return ''
+      }
+    })
+  } else if (node.nodeType === Node.ELEMENT_NODE) {
+    node.childNodes.forEach(child => interpolateMustache(child, scope))
+  }
+}
+
 
 function getPropByPath(obj, path) {
   return path.split('.').reduce((acc, part) => {
