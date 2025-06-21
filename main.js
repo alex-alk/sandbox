@@ -3,57 +3,57 @@
 // Unlike a ref which wraps the inner value in a special object, reactive() makes an object itself reactive
 // it only works for object types
 
+const arrayMutations = ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'];
+
 export function reactive(obj) {
   return new Proxy(obj, {
     get(target, key) {
       track(target, key);
-      return target[key];
+
+      if (Array.isArray(target) && arrayMutations.includes(key)) {
+        return function(...args) {
+          const result = Array.prototype[key].apply(target, args);
+          // trigger on length so effects tracking length will rerun
+          trigger(target, 'length');
+          trigger(target, key);
+          return result;
+        }
+      }
+      return Reflect.get(target, key);
     },
     set(target, key, value) {
-      target[key] = value;
+      const res = Reflect.set(target, key, value);
       trigger(target, key);
-      return true; // ✅ important fix
+      return res;
     }
   });
 }
 
-
-// function dep(target, key) {
-
-//     const track = () => {
-//         if (activeEffect) {
-//             const effects = getSubscribersForProperty(target, key)
-//                 //effects.add(activeEffect)
-//         }
-
-//         return link
-//     }
-
-//     return {
-//         track
-//     }
-// }
-
 export function ref(initialValue) {
-    //const dep = dep()
+  // wrap initialValue in reactive if it's object/array
+  let _value = (initialValue != null && typeof initialValue === 'object')
+    ? reactive(initialValue)
+    : initialValue;
 
-    const refObject = {
-        _value: initialValue,
-        get value() {
-            track(this, 'value')
-            return this._value
-        },
-        set value(newValue) {
-            this._value = newValue
-            trigger(refObject, 'value')
-        },
-        //subscribe(fn) {
-           //subscribers.add(fn)
-        //}
-        //,_subscribers: subscribers
+  return {
+    get value() {
+      // track access to the ref itself
+      track(this, 'value');
+      // if it's an array, also track its length
+      if (Array.isArray(_value)) {
+        track(_value, 'length');
+      }
+      return _value;
+    },
+    set value(newVal) {
+      _value = (newVal != null && typeof newVal === 'object')
+        ? reactive(newVal)
+        : newVal;
+      trigger(this, 'value');
     }
-  return refObject
+  };
 }
+
 
 let activeEffect = null
 
@@ -98,7 +98,6 @@ function getSubscribersForProperty(target, key) {
 }
 
 function trigger(target, key) {
-    console.log(target, key)
     const effects = getSubscribersForProperty(target, key)
     effects.forEach((effect) => effect())
 }
@@ -136,32 +135,43 @@ let currentComponents = []
 const bindings = {}
 export function init(component, data, cname) {
     currentComponents[cname] = component
+
+    // ✅ Store refs (data) on the component itself
+    component._bindings = data  // this ensures the refs are preserved and shared
+
     const directives = [
         'v-text', 'v-component', 'v-bind:src',
         'v-if', 'v-for', 'v-on:click', 'v-on:mouseover',
-        'v-bind:class', 'v-bind:disabled', 'v-component', 'v-on:submit', 'v-model'
+        'v-bind:class', 'v-bind:disabled', 'v-on:submit', 'v-model'
     ]
 
-    const selector = directives.map(directives => `[${directives.replace(':', '\\:')}]`).join(', ');
+    const selector = directives.map(d => `[${d.replace(':', '\\:')}]`).join(', ')
+    const elements = component.querySelectorAll(selector)
 
-    const elements = component.querySelectorAll(selector);
+    if (!bindings[component]) {
+        bindings[component] = []
+    }
+
     elements.forEach(el => {
-        if (!bindings[component]) {
-            bindings[component] = []
-        }
-
         for (const directive of directives) {
             bindAttribute(component, el, directive)
         }
     })
 
-
-    //updateComponent(component, data)
-
-    effect(() => {
-        updateComponent(component, data)
-    })
+     effect(() => {
+    for (const key in data) {
+      const val = data[key];
+      if (val && typeof val === 'object' && 'value' in val) {
+        // access the ref
+        const arr = val.value;
+        // if array, access its length
+        if (Array.isArray(arr)) arr.length;
+      }
+    }
+    updateComponent(component, data);
+  });
 }
+
 
 function bindAttribute(component, el, directive) {
     let refName = el.getAttribute(directive);
@@ -182,19 +192,25 @@ function bindAttribute(component, el, directive) {
             if (!bindings[component][refName]) {
                 bindings[component][refName] = []
             }
-            if (!bindings[component][refName][directive]) {
-                bindings[component][refName][directive] = []
+            if (!bindings[component][refName][0]) {
+                bindings[component][refName][0] = []
             }
-            bindings[component][refName][directive].push(el)
+            if (!bindings[component][refName][0][directive]) {
+                bindings[component][refName][0][directive] = []
+            }
+            bindings[component][refName][0][directive].push(el)
         } else if(constituentsComma.length > 1) {
             for (const refNameConst of constituentsComma) {
                 if (!bindings[component][refNameConst]) {
                     bindings[component][refNameConst] = []
                 }
-                if (!bindings[component][refNameConst][directive]) {
-                    bindings[component][refNameConst][directive] = []
+                if (!bindings[component][refNameConst][0]) {
+                    bindings[component][refNameConst][0] = []
                 }
-                bindings[component][refNameConst][directive].push(el)
+                if (!bindings[component][refNameConst][0][directive]) {
+                    bindings[component][refNameConst][0][directive] = []
+                }
+                bindings[component][refNameConst][0][directive].push(el)
             }
         } else if(constituentsDot.length === 2) {
             const refNameConst = constituentsDot[0]
@@ -215,10 +231,13 @@ function bindAttribute(component, el, directive) {
                 bindings[component][refName] = []
             }
 
-            if (!bindings[component][refName][directive]) {
-                bindings[component][refName][directive] = []
+            if (!bindings[component][refName][0]) {
+                bindings[component][refName][0]= []
             }
-            bindings[component][refName][directive].push(el)
+            if (!bindings[component][refName][0][directive]) {
+                bindings[component][refName][0][directive] = []
+            }
+            bindings[component][refName][0][directive].push(el)
         }
         
         // if (constituentsComma.length > 1) {
@@ -260,47 +279,43 @@ function updateComponent(component, data) {
       ? data[variableName].value
       : data[variableName];
 
-     if (variableName === 'review') {
+    if (Array.isArray(currentValue)) {
+    // Access length to ensure reactivity triggers on mutations
+        currentValue.length;
+    }
 
         for (const foundDot in foundBinds) {
-            
                 
             const foundDirectives = bindings[component][variableName][foundDot]
             
             for (const foundDirective in foundDirectives) {
                 const els = bindings[component][variableName][foundDot][foundDirective];
+
                 
                 for (const el of els) {
                     // Initialize previous value store
                     el._prevValues ??= {};
-                    const prevValue = el._prevValues[foundDirective];
+                    if (foundDirective === 'v-for') {
+                        const prevLen = el._prevValues['v-for.length'] ?? 0;
+                        const currLen = Array.isArray(currentValue) ? currentValue.length : 0;
 
-                    // Only update if value changed
-                    if (prevValue !== currentValue) {
-                    el._prevValues[foundDirective] = currentValue;
-                    updateElement(el, foundDirective, currentValue, data);
+                        if (prevLen !== currLen) {
+                            el._prevValues['v-for.length'] = currLen;
+                            updateElement(el, 'v-for', currentValue, data);
+                        }
+                        } else {
+                        // everything else: compare raw values
+                        const prevVal = el._prevValues[foundDirective];
+                        if (prevVal !== currentValue) {
+                            el._prevValues[foundDirective] = currentValue;
+                            updateElement(el, foundDirective, currentValue, data);
+                        }
                     }
                 }
             }
         }
-    } else {
-        for (const foundDirective in foundBinds) {
-            const els = foundBinds[foundDirective];
-
-            for (const el of els) {
-                // Initialize previous value store
-                el._prevValues ??= {};
-                const prevValue = el._prevValues[foundDirective];
-
-                // Only update if value changed
-                if (prevValue !== currentValue) {
-                el._prevValues[foundDirective] = currentValue;
-                updateElement(el, foundDirective, currentValue, data);
-                }
-            }
-        }
+    
     }
-  }
 }
 
 function updateElement(el, directive, value, data) {
@@ -315,12 +330,13 @@ function updateElement(el, directive, value, data) {
             next.style.display = value ? 'none' : ''
         }
     }
+
+
+
     if (directive === 'v-for') {
     const attribute = el.getAttribute('v-for');
-    // Parse "item in items" or "(item, index) in items"
     const [left, right] = attribute.split(' in ').map(s => s.trim());
-    
-    // Extract variable names (could be "item" or "(item, index)")
+
     let itemVar = left;
     let indexVar = null;
     const match = left.match(/^\(\s*([^,\s]+)\s*,\s*([^,\s]+)\s*\)$/);
@@ -328,13 +344,19 @@ function updateElement(el, directive, value, data) {
         itemVar = match[1];
         indexVar = match[2];
     }
-    
-    if (!Array.isArray(value)) {
-        console.warn('v-for expects an array value');
+
+    // Get the array from data (unwrapping refs if necessary)
+    let list = getPropByPath(data, right);
+    if (list && list.value !== undefined) {
+        list = list.value; // unwrap ref if needed
+    }
+
+    if (!Array.isArray(list)) {
+        console.warn('v-for expects an array value but got:', list);
         return;
     }
 
-    // Remove old rendered items except the template element
+    // Remove previously rendered v-for items
     let nextSibling = el.nextElementSibling;
     while (nextSibling && nextSibling.hasAttribute('data-v-for-item')) {
         const toRemove = nextSibling;
@@ -342,57 +364,64 @@ function updateElement(el, directive, value, data) {
         toRemove.remove();
     }
 
-    // Save original template if not saved yet
+    // Save original template HTML if not already saved
     if (!el.dataset.template) {
         el.dataset.template = el.innerHTML;
     }
 
-    // Render new elements from array
-    value.forEach((item, index) => {
-        const newEl = el.cloneNode(true);
-        newEl.removeAttribute('v-for');
-        newEl.setAttribute('data-v-for-item', ''); // mark it for removal next time
+    // Hide the original element template
+    //el.style.display = 'none';
 
-        // Build context for interpolation and event handlers
-        const context = {};
+    // Track where to insert the next item
+    //let insertAfterEl = el;
+
+    list.forEach((item, index) => {
+        const clone = el.cloneNode(true);
+
+        // Build context inheriting data + item vars
+        const context = Object.create(data);
         context[itemVar] = item;
-        if (indexVar) context[indexVar] = index;
+        if (indexVar !== null) {
+            context[indexVar] = index;
+        }
 
-        // Handle v-on:mouseover inside v-for (optional enhancement)
-        const onMouseover = newEl.getAttribute('v-on:mouseover');
+        // Reset content from template
+        clone.innerHTML = el.dataset.template;
+
+        // Interpolate {{}} bindings
+        interpolateMustache(clone, context);
+
+        // Handle v-on:mouseover if present
+        const onMouseover = clone.getAttribute('v-on:mouseover');
         if (onMouseover) {
             const fnMatch = onMouseover.match(/^(\w+)\(([\w.]+)\)$/);
             if (fnMatch) {
                 const fnName = fnMatch[1];
                 const argPath = fnMatch[2];
                 const fn = data[fnName];
-                let argValue = argPath === indexVar ? index : getPropByPath(context, argPath);
+                const argValue = (argPath === indexVar) ? index : context[argPath];
                 if (typeof fn === 'function') {
-                    newEl.addEventListener('mouseover', () => fn(argValue));
+                    clone.addEventListener('mouseover', () => fn(argValue));
                 }
             }
         }
 
-        // Handle v-bind:style inside v-for
-        const styleBinding = newEl.getAttribute('v-bind:style');
+        // Handle v-bind:style if present
+        const styleBinding = clone.getAttribute('v-bind:style');
         if (styleBinding) {
             const styleObject = new Function('with(this) { return ' + styleBinding + '; }').call(context);
-            updateElement(newEl, 'v-bind:style', styleObject, data);
+            updateElement(clone, 'v-bind:style', styleObject, data);
         }
 
-        // Replace interpolations {{ }} inside the element
-        // Set innerHTML to template first (clone content)
-newEl.innerHTML = newEl.dataset.template;
-
-// Then recursively interpolate all {{ }} in text nodes using full JS eval in context
-interpolateMustache(newEl, context);
-
-        el.insertAdjacentElement('afterend', newEl);
+        // ✅ Correct insertion order
+        el.insertAdjacentElement('afterend', clone);
+        //insertAfterEl = newEl; // advance insert point
     });
-
-    // Optionally hide the original template element itself
-    el.style.display = 'none';
 }
+
+
+
+
 
 
     if (directive === 'v-model') {
