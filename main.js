@@ -39,13 +39,10 @@ export function ref(initialValue) {
         _value: initialValue,
         get value() {
             track(this, 'value')
-            //track(refObject, 'value')
-            //console.log('getting ', this._value)
             return this._value
         },
         set value(newValue) {
             this._value = newValue
-            //console.log('setting ', newValue)
             trigger(refObject, 'value')
         },
         //subscribe(fn) {
@@ -137,7 +134,7 @@ export function ref_(initialValue) {
 const bindings = {}
 export function init(component, data) {
 
-    const directives = ['v-text', 'v-component', 'v-bind:src', 'v-if', 'v-for', 'v-on:click']
+    const directives = ['v-text', 'v-component', 'v-bind:src', 'v-if', 'v-for', 'v-on:click', 'v-on:mouseover']
 
     const selector = directives.map(directives => `[${directives.replace(':', '\\:')}]`).join(', ');
 
@@ -158,7 +155,7 @@ export function init(component, data) {
     //updateComponent(component, data)
 
     effect(() => {
-        console.log(data)
+        //console.log(data)
         updateComponent(component, data)
     })
 }
@@ -221,7 +218,7 @@ function updateComponent(component, data) {
         // Only update if value changed
         if (prevValue !== currentValue) {
           el._prevValues[foundDirective] = currentValue;
-          updateElement(el, foundDirective, currentValue);
+          updateElement(el, foundDirective, currentValue, data);
         }
       }
     }
@@ -249,7 +246,7 @@ function updateComponent_(component, data) {
         
     }
 }
-function updateElement(el, directive, value) {
+function updateElement(el, directive, value, data) {
 
     if (directive === 'v-bind:src') {
         el.src = value
@@ -272,21 +269,39 @@ function updateElement(el, directive, value) {
 
         for (const arrayEl in value) {
 
-            const newElement = el.cloneNode()
+            const newElement = el.cloneNode(true)
             
             const context = {}
             context[variableName] = value[arrayEl]
    
-
             if (!el.dataset.template) {
                 el.dataset.template = el.textContent; // Save original with {{ }}
             }
+
+            const onMouseover = el.getAttribute('v-on:mouseover')
+            if (onMouseover) {
+                // evaluate the expression using context and data
+                const expression = el.getAttribute('v-on:mouseover');
+
+                const fnMatch = expression.match(/^(\w+)\(([\w.]+)\)$/);
+                if (fnMatch) {
+                    const fnName = fnMatch[1]; // e.g., updateImage
+                    const argPath = fnMatch[2]; // e.g., variant.image
+                    const fn = data[fnName];
+
+                    const contextValue = getPropByPath(context, argPath);
+
+                    if (typeof fn === 'function') {
+                        newElement.addEventListener('mouseover', () => fn(contextValue));
+                    }
+                }
+            }
+
         
             const replacedText = interpolate(el.dataset.template, context)
 
             newElement.textContent = replacedText
-
-            el.insertAdjacentElement('afterend', newElement)
+            el.insertAdjacentElement('beforeend', newElement)
         }
     }
 
@@ -312,6 +327,9 @@ function updateElement(el, directive, value) {
 
     if(directive === 'v-on:click') {
         el.addEventListener('click', value)
+    }
+    if(directive === 'v-on:mouseover') {
+        el.addEventListener('mouseover', value)
     }
 }
 

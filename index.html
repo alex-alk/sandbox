@@ -30,13 +30,16 @@ const content = `
         <ul>
           <li class="a" v-for="detail in details" v-text="product"> {{ detail }} </li>
         </ul>
-        <div v-for="variant in variants">{{ variant.color }}</div>
+        <div 
+            v-on:mouseover="updateImage(variant.image)"
+            v-for="variant in variants">{{ variant.color }}</div>
         <button class="button" v-on:click="addToCart">Add to cart</button>
       </div>
     </div>
   </div>`
 
 const socksGreenImage = './assets/images/socks_green.jpeg'
+const socksBlueImage = './assets/images/socks_blue.jpeg'
 
 const product = ref('Socks')
 const product1 = ref('Socks1')
@@ -44,14 +47,18 @@ const image = ref(socksGreenImage)
 const inStock = ref(true)
 const details = ref(['50% cotton', '30% wool', '20% polyester'])
 const variants = ref([
-  { id: 2234, color: 'green' },
-  { id: 2235, color: 'blue' },
+  { id: 2234, color: 'green' , image: socksGreenImage},
+  { id: 2235, color: 'blue' , image: socksBlueImage},
 ])
 const cart = ref(0)
 
 const addToCart = () => {
     cart.value += 1
 }
+const updateImage = (variantImage) => { 
+    image.value = variantImage 
+}
+//const updateImage = (variantImage) => image.value = variantImage
 
 // setInterval(() => {
 //     const d = new Date();
@@ -72,7 +79,7 @@ const app = document.getElementById('app');
 app.innerHTML = content.trim()
 
 
-init(app, {product, product1, image, inStock, details, variants, cart, addToCart})
+init(app, {product, product1, image, inStock, details, variants, cart, addToCart, updateImage})
 
 
 </script>
