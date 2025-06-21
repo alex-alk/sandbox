@@ -33,8 +33,6 @@ const review = reactive({
 const onSubmit = (e) => {
     e.preventDefault()
 
-    console.log(review)
-
     if (review.name === '' || review.content === '' || review.rating === null) {
       alert('Review is incomplete. Please fill out every field.')
       return
@@ -48,9 +46,9 @@ const onSubmit = (e) => {
     
     emit('review-submitted', productReview)
 
-    review.name = ''
-    review.content = ''
-    review.rating = null
+    // review.name = ''
+    // review.content = ''
+    // review.rating = null
 }
 
 const template = document.createElement('template')

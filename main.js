@@ -98,7 +98,7 @@ function getSubscribersForProperty(target, key) {
 }
 
 function trigger(target, key) {
-
+    console.log(target, key)
     const effects = getSubscribersForProperty(target, key)
     effects.forEach((effect) => effect())
 }

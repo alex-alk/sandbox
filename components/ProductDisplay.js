@@ -98,7 +98,9 @@ const reviews = ref([])
 const reviewList = reviewListF(reviews)
 
 const addReview = (review) => {
-    reviews.value.push(review)
+  
+    reviews.value.push(review.detail)
+    console.log('pushing' ,reviews.value)
 }
 
 
