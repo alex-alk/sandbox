@@ -1,251 +1,330 @@
-const bindings = {}
-const computedDefs = {}
+// reactive() converts the object deeply: nested objects are also wrapped with reactive() when accessed. 
+// It is also called by ref() internally when the ref value is an object.
+// Unlike a ref which wraps the inner value in a special object, reactive() makes an object itself reactive
+// it only works for object types
 
-function evaluateStyleBinding(binding, context, alias) {
-  try {
-    const fn = new Function(alias, `return ${binding}`)
-    const styles = fn(context)
-    return Object.entries(styles)
-      .map(([k, v]) => {
-        const prop = k.replace(/([A-Z])/g, '-$1').toLowerCase()
-        return `${prop}: ${v}`
-      })
-      .join('; ')
-  } catch (err) {
-    console.error('Style binding failed:', binding, err)
-    return ''
-  }
-}
-
-export const state = new Proxy({}, {
-  set(target, variableName, value) {
-    target[variableName] = value
-
-
-
-
-    const binding = bindings[variableName]
-    if (binding) {
-      // Handle v-for cloning
-      const forList = binding['v-for']
-      if (forList) {
-        for (const el of forList) {
-          const elid = el.getAttribute('elid')
-          const key = el.getAttribute('v-for') || ''
-          let alias = '', arrayName = key
-          if (key.includes(' in ')) {
-            [alias, arrayName] = key.split(' in ').map(s => s.trim())
-          } else {
-            arrayName = key.trim()
-          }
-          const list = value
-          if (!elid && Array.isArray(list)) {
-            let refNode = el
-            list.forEach((item, i) => {
-              const clone = el.cloneNode(true)
-              clone.setAttribute('elid', i)
-
-              // Apply style
-              const styleBinding = clone.getAttribute('v-bind:style')
-              if (styleBinding && alias) {
-                clone.setAttribute(
-                  'style',
-                  evaluateStyleBinding(styleBinding, item, alias)
-                )
-              } else if (!alias && typeof item === 'string') {
-                clone.textContent = item
-              }
-
-              // Bind events
-              for (const attr of clone.attributes) {
-                if (attr.name.startsWith('v-on:')) {
-                  const [_, eventName] = attr.name.split(':')
-                  const handlerName = attr.value
-                  if (handlerName && state[handlerName]) {
-                    clone.addEventListener(eventName, state[handlerName])
-                  }
-                }
-              }
-              refNode.parentNode.insertBefore(clone, refNode.nextSibling)
-              refNode = clone
-            })
-            el.remove()
-          }
-        }
-      }
-
-      // Handle other directives
-      if (binding['v-text']) {
-        binding['v-text'].forEach(el => {
-          el.textContent = state[el.getAttribute('v-text')]
-        })
-      }
-      if (binding['v-bind:src']) {
-        binding['v-bind:src'].forEach(el => {
-          el.src = state[el.getAttribute('v-bind:src')]
-        })
-      }
-
-      
-      if (binding['v-bind:class']) {
-  binding['v-bind:class'].forEach(el => {
-    const key = el.getAttribute('v-bind:class')
-    const prevClass = el._prevClass || ''
-    const newClass = state[key]
-
-    if (prevClass && el.classList.contains(prevClass)) {
-      el.classList.remove(prevClass)
-    }
-
-    if (newClass) {
-      el.classList.add(newClass)
-      el._prevClass = newClass
-    } else {
-      el._prevClass = ''
+export function reactive(obj) {
+  return new Proxy(obj, {
+    get(target, key) {
+      track(target, key)
+      return target[key]
+    },
+    set(target, key, value) {
+      target[key] = value
+      trigger(target, key)
     }
   })
 }
-      if (binding['v-bind:disabled']) {
-        binding['v-bind:disabled'].forEach(el => {
-          el.disabled = state[el.getAttribute('v-bind:disabled')]
-        })
-      }
-      if (binding['v-on:click']) {
-        binding['v-on:click'].forEach(el => {
-          el.onclick = state[el.getAttribute('v-on:click')]
-        })
-      }
-      if (binding['v-if']) {
-        binding['v-if'].forEach(el => {
-          const key = el.getAttribute('v-if')
-          const val = state[key]
-          el.style.display = val ? '' : 'none'
-          const next = el.nextElementSibling
-          if (next?.hasAttribute('v-else')) {
-            next.style.display = val ? 'none' : ''
-          }
-        })
-      }
-    }
 
-    // Recompute computed properties (skip if setting a computed)
-    if (!computedDefs[variableName]) {
-      for (const [cName, getter] of Object.entries(computedDefs)) {
-        const newVal = getter()
-        if (state[cName] !== newVal) {
-          state[cName] = newVal
+// function dep(target, key) {
+
+//     const track = () => {
+//         if (activeEffect) {
+//             const effects = getSubscribersForProperty(target, key)
+//                 //effects.add(activeEffect)
+//         }
+
+//         return link
+//     }
+
+//     return {
+//         track
+//     }
+// }
+
+export function ref(initialValue) {
+    //const dep = dep()
+
+    const refObject = {
+        _value: initialValue,
+        get value() {
+            track(this, 'value')
+            //track(refObject, 'value')
+            //console.log('getting ', this._value)
+            return this._value
+        },
+        set value(newValue) {
+            this._value = newValue
+            //console.log('setting ', newValue)
+            trigger(refObject, 'value')
+        },
+        //subscribe(fn) {
+           //subscribers.add(fn)
+        //}
+        //,_subscribers: subscribers
+    }
+  return refObject
+}
+
+let activeEffect = null
+
+export function effect(fn) {
+  const wrappedEffect = () => {
+    activeEffect = wrappedEffect;
+    fn();
+    activeEffect = null;
+  };
+  wrappedEffect(); // run once to register
+}
+
+function track(target, key) {
+    if (activeEffect) {
+        const effects = getSubscribersForProperty(target, key)
+        effects.add(activeEffect)
+    } else {
+        return
+    }
+}
+
+// Effect subscriptions are stored in a global WeakMap<target, Map<key, Set<effect>>> data structure. 
+// If no subscribing effects Set was found for a property (tracked for the first time), 
+// it will be created. 
+
+const targetMap = new WeakMap();
+
+function getSubscribersForProperty(target, key) {
+  let depsMap = targetMap.get(target);
+  if (!depsMap) {
+    depsMap = new Map();
+    targetMap.set(target, depsMap);
+  }
+
+  let deps = depsMap.get(key);
+  if (!deps) {
+    deps = new Set();
+    depsMap.set(key, deps);
+  }
+
+  return deps;
+}
+
+function trigger(target, key) {
+
+    const effects = getSubscribersForProperty(target, key)
+    effects.forEach((effect) => effect())
+}
+
+export function computed(getter) {
+    return {
+        get value() {
+            return getter()
         }
-      }
     }
-
-    return true
-  }
-})
-
-// Define reactive reference
-export function ref(variableName, value) {
-  state[variableName] = value
-  return {
-    get value() {
-      return state[variableName]
-    },
-    set value(val) {
-      state[variableName] = val
-    }
-  }
 }
 
-// Define computed property
-export function computed(name, getter) {
-  computedDefs[name] = getter
-  // Initialize computed value
-  state[name] = getter()
-  return () => state[name]
+export function ref_(initialValue) {
+    let _value = initialValue;
+    const subscribers = new Set();
+
+    return {
+        get value() {
+            return _value;
+        },
+        set value(newVal) {
+            if (_value !== newVal) {
+                _value = newVal;
+                // Notify all subscribers about the change
+                subscribers.forEach(fn => fn());
+            }
+        },
+        subscribe(fn) {
+            subscribers.add(fn);
+        }
+    };
 }
 
-// Initialize bindings
-export function init(component) {
-  const all = component.querySelectorAll(
-    '[v-text], [v-bind\\:src], [v-if], [v-for], ' +
-    '[v-on\\:click], [v-on\\:mouseover], ' +
-    '[v-bind\\:class], [v-bind\\:disabled], [v-bind\\:style]'
-  )
-  all.forEach(el => {
-    const directives = [
-      { attr: 'v-text', key: el.getAttribute('v-text') },
-      { attr: 'v-bind:src', key: el.getAttribute('v-bind:src') },
-      { attr: 'v-if', key: el.getAttribute('v-if') },
-      { attr: 'v-for', key: el.getAttribute('v-for') },
-      { attr: 'v-on:click', key: el.getAttribute('v-on:click') },
-      { attr: 'v-on:mouseover', key: el.getAttribute('v-on:mouseover') },
-      { attr: 'v-bind:class', key: el.getAttribute('v-bind:class') },
-      { attr: 'v-bind:disabled', key: el.getAttribute('v-bind:disabled') },
-    ]
 
-    directives.forEach(({ attr, key }) => {
-      if (!key) return
+const bindings = {}
+export function init(component, data) {
 
-      let alias = '', arrayName = key
-      if (attr === 'v-for') {
-        if (key.includes(' in ')) {
-          [alias, arrayName] = key.split(' in ').map(s => s.trim())
+    const directives = ['v-text', 'v-component', 'v-bind:src', 'v-if', 'v-for', 'v-on:click']
+
+    const selector = directives.map(directives => `[${directives.replace(':', '\\:')}]`).join(', ');
+
+    const elements = component.querySelectorAll(selector);
+    elements.forEach(el => {
+        if (!bindings[component]) {
+            bindings[component] = []
+        }
+
+        for (const directive of directives) {
+            bindAttribute(component, el, directive)
+        }
+    })
+
+    console.log('bindings: ')
+    console.log(bindings)
+
+    //updateComponent(component, data)
+
+    effect(() => {
+        console.log(data)
+        updateComponent(component, data)
+    })
+}
+
+function bindAttribute(component, el, directive) {
+    let refName = el.getAttribute(directive);
+
+    if (refName) {
+
+        const constituentsRaw = refName.split(' in ')
+        const constituents = constituentsRaw.map(cr => cr.trim())
+
+        const constituentsCommaRaw = refName.split(',')
+        const constituentsComma = constituentsCommaRaw.map(cr => cr.trim())
+        
+        if (constituentsComma.length > 1) {
+            for (const refNameConst of constituentsComma) {
+                if (!bindings[component][refNameConst]) {
+                    bindings[component][refNameConst] = []
+                }
+                if (!bindings[component][refNameConst][directive]) {
+                    bindings[component][refNameConst][directive] = []
+                }
+                bindings[component][refNameConst][directive].push(el)
+            }
         } else {
-          arrayName = key.trim()
+
+            if (constituents.length > 1) {
+                refName = constituents[1]
+            }
+
+            if (!bindings[component][refName]) {
+                bindings[component][refName] = []
+            }
+            if (!bindings[component][refName][directive]) {
+                bindings[component][refName][directive] = []
+            }
+            bindings[component][refName][directive].push(el)
         }
-      } else {
-        arrayName = key.split('::')[0]
+    }
+}
+
+function updateComponent(component, data) {
+  for (const variableName in data) {
+    const foundBinds = bindings[component][variableName];
+    if (!foundBinds) continue;
+
+    const currentValue = 'value' in data[variableName]
+      ? data[variableName].value
+      : data[variableName];
+
+    for (const foundDirective in foundBinds) {
+      const els = foundBinds[foundDirective];
+
+      for (const el of els) {
+        // Initialize previous value store
+        el._prevValues ??= {};
+        const prevValue = el._prevValues[foundDirective];
+
+        // Only update if value changed
+        if (prevValue !== currentValue) {
+          el._prevValues[foundDirective] = currentValue;
+          updateElement(el, foundDirective, currentValue);
+        }
       }
+    }
+  }
+}
 
-      if (!bindings[arrayName]) bindings[arrayName] = {}
-      if (!bindings[arrayName][attr]) bindings[arrayName][attr] = []
-      bindings[arrayName][attr].push(el)
 
-      const value = state[arrayName]
-      if (attr === 'v-text') el.textContent = value
-      if (attr === 'v-bind:src') el.src = value
-      if (attr === 'v-bind:class' && value) {
+function updateComponent_(component, data) {
+    for (const variableName in data) {
 
-        el.classList.add(value)
+        const foundBinds = bindings[component][variableName];
 
-      }
-      if (attr === 'v-bind:disabled') el.disabled = value
-      if (attr === 'v-if') {
+        for (const foundDirective in foundBinds) {
+
+            const els = foundBinds[foundDirective]
+
+            for (const el of els) {
+                if ('value' in data[variableName]) {
+                    updateElement(el, foundDirective, data[variableName].value)
+                } else {
+                    updateElement(el, foundDirective, data[variableName])
+                }
+            }
+        }
+        
+    }
+}
+function updateElement(el, directive, value) {
+
+    if (directive === 'v-bind:src') {
+        el.src = value
+    }
+    if (directive === 'v-if') {
         el.style.display = value ? '' : 'none'
         const next = el.nextElementSibling
-        if (next?.hasAttribute('v-else')) next.style.display = value ? 'none' : ''
-      }
-      if (attr === 'v-on:click') el.onclick = value
-
-      if (attr === 'v-for') {
-        const elid = el.getAttribute('elid')
-        const list = state[arrayName]
-        if (!elid && Array.isArray(list)) {
-          let refNode = el
-          list.forEach((item, i) => {
-            const clone = el.cloneNode(true)
-            clone.setAttribute('elid', i)
-            const styleBinding = clone.getAttribute('v-bind:style')
-            if (styleBinding && alias) {
-              clone.setAttribute(
-                'style',
-                evaluateStyleBinding(styleBinding, item, alias)
-              )
-            } else if (!alias && typeof item === 'string') {
-              clone.textContent = item
-            }
-            for (const a of clone.attributes) {
-              if (a.name.startsWith('v-on:')) {
-                const [_, evt] = a.name.split(':')
-                const handler = a.value
-                if (handler && state[handler]) clone.addEventListener(evt, state[handler])
-              }
-            }
-            refNode.parentNode.insertBefore(clone, refNode.nextSibling)
-            refNode = clone
-          })
-          el.remove()
+        if (next?.hasAttribute('v-else')) {
+            next.style.display = value ? 'none' : ''
         }
-      }
-    })
-  })
+    }
+    if (directive === 'v-for') {
+        // keep the original element in memory
+        // find interpolation in element
+
+        const attribute = el.getAttribute('v-for');
+        const constituentsRaw = attribute.split(' in ')
+        const constituents = constituentsRaw.map(cr => cr.trim())
+        const variableName = constituents[0];
+
+        for (const arrayEl in value) {
+
+            const newElement = el.cloneNode()
+            
+            const context = {}
+            context[variableName] = value[arrayEl]
+   
+
+            if (!el.dataset.template) {
+                el.dataset.template = el.textContent; // Save original with {{ }}
+            }
+        
+            const replacedText = interpolate(el.dataset.template, context)
+
+            newElement.textContent = replacedText
+
+            el.insertAdjacentElement('afterend', newElement)
+        }
+    }
+
+    if (directive === 'v-text') {
+        
+        const variableNames = el.getAttribute(directive)
+
+        const constituentsCommaRaw = variableNames.split(',')
+        const constituentsComma = constituentsCommaRaw.map(cr => cr.trim())
+
+        const context = {}
+        for (const variableName of constituentsComma) {
+            context[variableName] = value
+        }
+
+        if (!el.dataset.template) {
+            el.dataset.template = el.textContent; // Save original with {{ }}
+        }
+        
+        const replacedText = interpolate(el.dataset.template, context)
+        el.textContent = replacedText
+    }
+
+    if(directive === 'v-on:click') {
+        el.addEventListener('click', value)
+    }
 }
+
+function getPropByPath(obj, path) {
+  return path.split('.').reduce((acc, part) => {
+    return acc && acc[part] !== undefined ? acc[part] : undefined;
+  }, obj);
+}
+
+function interpolate(str, context) {
+  return str.replace(/{{\s*([\w.]+)\s*}}/g, (match, path) => {
+    const value = getPropByPath(context, path);
+    return value !== undefined ? value : match;
+  });
+}
+
