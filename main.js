@@ -6,15 +6,17 @@
 export function reactive(obj) {
   return new Proxy(obj, {
     get(target, key) {
-      track(target, key)
-      return target[key]
+      track(target, key);
+      return target[key];
     },
     set(target, key, value) {
-      target[key] = value
-      trigger(target, key)
+      target[key] = value;
+      trigger(target, key);
+      return true; // ✅ important fix
     }
-  })
+  });
 }
+
 
 // function dep(target, key) {
 
@@ -137,7 +139,7 @@ export function init(component, data, cname) {
     const directives = [
         'v-text', 'v-component', 'v-bind:src',
         'v-if', 'v-for', 'v-on:click', 'v-on:mouseover',
-        'v-bind:class', 'v-bind:disabled', 'v-component', 'v-on:submit'
+        'v-bind:class', 'v-bind:disabled', 'v-component', 'v-on:submit', 'v-model'
     ]
 
     const selector = directives.map(directives => `[${directives.replace(':', '\\:')}]`).join(', ');
@@ -153,8 +155,6 @@ export function init(component, data, cname) {
         }
     })
 
-    console.log('bindings: ')
-    console.log(bindings)
 
     //updateComponent(component, data)
 
@@ -173,6 +173,9 @@ function bindAttribute(component, el, directive) {
 
         const constituentsCommaRaw = refName.split(',')
         const constituentsComma = constituentsCommaRaw.map(cr => cr.trim())
+
+        const constituentsDotRaw = refName.split('.')
+        const constituentsDot = constituentsDotRaw.map(cr => cr.trim())
 
         if (constituents.length > 1) {
             refName = constituents[1]
@@ -193,10 +196,25 @@ function bindAttribute(component, el, directive) {
                 }
                 bindings[component][refNameConst][directive].push(el)
             }
-        } else {
+        } else if(constituentsDot.length === 2) {
+            const refNameConst = constituentsDot[0]
+            const refNameDot = constituentsDot[1]
+            if (!bindings[component][refNameConst]) {
+                bindings[component][refNameConst] = []
+            }
+            if (!bindings[component][refNameConst][refNameDot]) {
+                bindings[component][refNameConst][refNameDot] = []
+            }
+            if (!bindings[component][refNameConst][refNameDot][directive]) {
+                bindings[component][refNameConst][refNameDot][directive] = []
+            }
+            bindings[component][refNameConst][refNameDot][directive].push(el)
+        }
+         else {
             if (!bindings[component][refName]) {
                 bindings[component][refName] = []
             }
+
             if (!bindings[component][refName][directive]) {
                 bindings[component][refName][directive] = []
             }
@@ -233,6 +251,8 @@ function bindAttribute(component, el, directive) {
 function updateComponent(component, data) {
 
   for (const variableName in data) {
+
+
     const foundBinds = bindings[component][variableName];
     if (!foundBinds) continue;
 
@@ -240,20 +260,45 @@ function updateComponent(component, data) {
       ? data[variableName].value
       : data[variableName];
 
-    for (const foundDirective in foundBinds) {
-      const els = foundBinds[foundDirective];
+     if (variableName === 'review') {
 
-      for (const el of els) {
-        // Initialize previous value store
-        el._prevValues ??= {};
-        const prevValue = el._prevValues[foundDirective];
+        for (const foundDot in foundBinds) {
+            
+                
+            const foundDirectives = bindings[component][variableName][foundDot]
+            
+            for (const foundDirective in foundDirectives) {
+                const els = bindings[component][variableName][foundDot][foundDirective];
+                
+                for (const el of els) {
+                    // Initialize previous value store
+                    el._prevValues ??= {};
+                    const prevValue = el._prevValues[foundDirective];
 
-        // Only update if value changed
-        if (prevValue !== currentValue) {
-          el._prevValues[foundDirective] = currentValue;
-          updateElement(el, foundDirective, currentValue, data);
+                    // Only update if value changed
+                    if (prevValue !== currentValue) {
+                    el._prevValues[foundDirective] = currentValue;
+                    updateElement(el, foundDirective, currentValue, data);
+                    }
+                }
+            }
         }
-      }
+    } else {
+        for (const foundDirective in foundBinds) {
+            const els = foundBinds[foundDirective];
+
+            for (const el of els) {
+                // Initialize previous value store
+                el._prevValues ??= {};
+                const prevValue = el._prevValues[foundDirective];
+
+                // Only update if value changed
+                if (prevValue !== currentValue) {
+                el._prevValues[foundDirective] = currentValue;
+                updateElement(el, foundDirective, currentValue, data);
+                }
+            }
+        }
     }
   }
 }
@@ -333,6 +378,65 @@ function updateElement(el, directive, value, data) {
             el.insertAdjacentElement('afterend', newElement)
         }
     }
+
+    if (directive === 'v-model') {
+    const modelAttr = el.getAttribute(directive);
+    const [modelPathRaw, ...modRaw] = modelAttr.split('.');
+    const modifiers = modRaw || [];
+    const pathParts = modelAttr.split('.');
+    const modelName = pathParts[0];
+
+
+    const getModelValue = () => getPropByPath(data, modelAttr);
+    const setModelValue = (val) => {
+        const path = pathParts.slice(1);
+        let obj = data[modelName];
+        if ('value' in obj) obj = obj.value; // unwrap ref
+        let target = obj;
+
+        for (let i = 0; i < path.length - 1; i++) {
+            if (!target[path[i]]) return;
+            target = target[path[i]];
+        }
+
+        const lastKey = path[path.length - 1];
+
+        if (path.length === 0) {
+            if ('value' in data[modelName]) {
+                data[modelName].value = val;
+            } else {
+                data[modelName] = val;
+            }
+        } else {
+            target[lastKey] = val;
+        }
+    };
+
+    const currentValue = getModelValue();
+
+    if (el.tagName === 'SELECT') {
+        el.value = currentValue;
+        el.addEventListener('change', (e) => {
+            let newVal = e.target.value;
+            if (modifiers.includes('number')) newVal = Number(newVal);
+            setModelValue(newVal);
+        });
+    } else if (el.type === 'checkbox') {
+        el.checked = currentValue;
+        el.addEventListener('change', (e) => {
+            setModelValue(e.target.checked);
+        });
+    } else {
+        el.value = currentValue;
+        el.addEventListener('input', (e) => {
+            let newVal = e.target.value;
+            if (modifiers.includes('number')) newVal = Number(newVal);
+            if (modifiers.includes('trim')) newVal = newVal.trim();
+            setModelValue(newVal);
+        });
+    }
+}
+
 
     if (directive === 'v-text') {
         

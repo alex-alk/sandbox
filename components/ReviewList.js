@@ -20,7 +20,7 @@ const templateEl = document.createElement('template');
 templateEl.innerHTML = templ.trim(); // trim() avoids stray whitespace
 const component = templateEl.content
 
-init(component, {reviews}, 'ReviewList')
+init(component, { reviews }, 'ReviewList')
 
 return component;
 
