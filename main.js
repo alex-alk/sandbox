@@ -134,7 +134,11 @@ export function ref_(initialValue) {
 const bindings = {}
 export function init(component, data) {
 
-    const directives = ['v-text', 'v-component', 'v-bind:src', 'v-if', 'v-for', 'v-on:click', 'v-on:mouseover']
+    const directives = [
+        'v-text', 'v-component', 'v-bind:src',
+        'v-if', 'v-for', 'v-on:click', 'v-on:mouseover',
+        'v-bind:class', 'v-bind:disabled', 'v-component'
+    ]
 
     const selector = directives.map(directives => `[${directives.replace(':', '\\:')}]`).join(', ');
 
@@ -170,8 +174,17 @@ function bindAttribute(component, el, directive) {
 
         const constituentsCommaRaw = refName.split(',')
         const constituentsComma = constituentsCommaRaw.map(cr => cr.trim())
-        
-        if (constituentsComma.length > 1) {
+
+        if (constituents.length > 1) {
+            refName = constituents[1]
+            if (!bindings[component][refName]) {
+                bindings[component][refName] = []
+            }
+            if (!bindings[component][refName][directive]) {
+                bindings[component][refName][directive] = []
+            }
+            bindings[component][refName][directive].push(el)
+        } else if(constituentsComma.length > 1) {
             for (const refNameConst of constituentsComma) {
                 if (!bindings[component][refNameConst]) {
                     bindings[component][refNameConst] = []
@@ -182,11 +195,6 @@ function bindAttribute(component, el, directive) {
                 bindings[component][refNameConst][directive].push(el)
             }
         } else {
-
-            if (constituents.length > 1) {
-                refName = constituents[1]
-            }
-
             if (!bindings[component][refName]) {
                 bindings[component][refName] = []
             }
@@ -195,6 +203,31 @@ function bindAttribute(component, el, directive) {
             }
             bindings[component][refName][directive].push(el)
         }
+        
+        // if (constituentsComma.length > 1) {
+        //     for (const refNameConst of constituentsComma) {
+        //         if (!bindings[component][refNameConst]) {
+        //             bindings[component][refNameConst] = []
+        //         }
+        //         if (!bindings[component][refNameConst][directive]) {
+        //             bindings[component][refNameConst][directive] = []
+        //         }
+        //         bindings[component][refNameConst][directive].push(el)
+        //     }
+        // } else {
+
+        //     if (constituents.length > 1) {
+        //         refName = constituents[1]
+        //     }
+
+        //     if (!bindings[component][refName]) {
+        //         bindings[component][refName] = []
+        //     }
+        //     if (!bindings[component][refName][directive]) {
+        //         bindings[component][refName][directive] = []
+        //     }
+        //     bindings[component][refName][directive].push(el)
+        // }
     }
 }
 
@@ -218,6 +251,7 @@ function updateComponent(component, data) {
         // Only update if value changed
         if (prevValue !== currentValue) {
           el._prevValues[foundDirective] = currentValue;
+          
           updateElement(el, foundDirective, currentValue, data);
         }
       }
@@ -225,27 +259,6 @@ function updateComponent(component, data) {
   }
 }
 
-
-function updateComponent_(component, data) {
-    for (const variableName in data) {
-
-        const foundBinds = bindings[component][variableName];
-
-        for (const foundDirective in foundBinds) {
-
-            const els = foundBinds[foundDirective]
-
-            for (const el of els) {
-                if ('value' in data[variableName]) {
-                    updateElement(el, foundDirective, data[variableName].value)
-                } else {
-                    updateElement(el, foundDirective, data[variableName])
-                }
-            }
-        }
-        
-    }
-}
 function updateElement(el, directive, value, data) {
 
     if (directive === 'v-bind:src') {
@@ -265,8 +278,16 @@ function updateElement(el, directive, value, data) {
         const attribute = el.getAttribute('v-for');
         const constituentsRaw = attribute.split(' in ')
         const constituents = constituentsRaw.map(cr => cr.trim())
-        const variableName = constituents[0];
+        let variableName = constituents[0];
 
+        const match = variableName.match(/\(\s*([^,\s]+)\s*,/);
+
+        if (match) {
+            const word = match[1]; // "variant"
+            variableName = word
+        }
+
+        value = value.reverse()
         for (const arrayEl in value) {
 
             const newElement = el.cloneNode(true)
@@ -289,19 +310,30 @@ function updateElement(el, directive, value, data) {
                     const argPath = fnMatch[2]; // e.g., variant.image
                     const fn = data[fnName];
 
-                    const contextValue = getPropByPath(context, argPath);
+                    let contextValue = arrayEl
+                    if (argPath !== 'index') {
+                        contextValue = getPropByPath(context, argPath);
+                    } 
+
+                    console.log('cv', context, argPath)
 
                     if (typeof fn === 'function') {
                         newElement.addEventListener('mouseover', () => fn(contextValue));
                     }
                 }
             }
+            const styleBinding = el.getAttribute('v-bind:style');
+            if (styleBinding) {
+                // Very basic parser for { backgroundColor: variant.color }
+                const styleObject = new Function('with(this) { return ' + styleBinding + '; }').call(context);
+                updateElement(newElement, 'v-bind:style', styleObject, data);
+            }
 
         
             const replacedText = interpolate(el.dataset.template, context)
 
             newElement.textContent = replacedText
-            el.insertAdjacentElement('beforeend', newElement)
+            el.insertAdjacentElement('afterend', newElement)
         }
     }
 
@@ -330,6 +362,35 @@ function updateElement(el, directive, value, data) {
     }
     if(directive === 'v-on:mouseover') {
         el.addEventListener('mouseover', value)
+    }
+    if (directive === 'v-bind:class') {
+        if (typeof value === 'object' && value !== null) {
+            for (const [className, condition] of Object.entries(value)) {
+            if (condition) {
+                el.classList.add(className);
+            } else {
+                el.classList.remove(className);
+            }
+            }
+        } else if (typeof value === 'string') {
+            el.className = value;
+        }
+    }
+
+    if (directive === 'v-bind:disabled') {
+        el.disabled = value
+    }
+    if (directive === 'v-bind:style') {
+        if (typeof value === 'object' && value !== null) {
+            for (const [styleName, styleValue] of Object.entries(value)) {
+            el.style[styleName] = styleValue;
+            }
+        } else if (typeof value === 'string') {
+            el.style.cssText = value;
+        }
+    }
+    if (directive === 'v-component') {
+        el.replaceWith(value);
     }
 }
 
