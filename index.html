@@ -18,17 +18,26 @@ import productDisplayF from './components/ProductDisplay.js'
 const content = `
 <div class="nav-bar"></div>
 <div class="cart" v-text="cart">Cart({{ cart }})</div>
-<template v-component="productDisplay">`
+<template v-component="productDisplay" @add-to-cart="updateCart">`
 
 const cart = ref(0)
 const premium = ref(true)
+
+const cartEls = []
+const updateCart = (id) => {
+  cartEls.push(id)
+  cart.value = cartEls.length
+}
+
+
+
 const productDisplay = productDisplayF(premium)
 
 
 const app = document.getElementById('app');
 app.innerHTML = content.trim()
 
-init(app, {cart, premium, productDisplay})
+init(app, {cart, premium, productDisplay, updateCart}, 'index')
 
 
 </script>

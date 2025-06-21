@@ -130,14 +130,14 @@ export function ref_(initialValue) {
     };
 }
 
-
+let currentComponents = []
 const bindings = {}
-export function init(component, data) {
-
+export function init(component, data, cname) {
+    currentComponents[cname] = component
     const directives = [
         'v-text', 'v-component', 'v-bind:src',
         'v-if', 'v-for', 'v-on:click', 'v-on:mouseover',
-        'v-bind:class', 'v-bind:disabled', 'v-component'
+        'v-bind:class', 'v-bind:disabled', 'v-component', 'v-on:submit'
     ]
 
     const selector = directives.map(directives => `[${directives.replace(':', '\\:')}]`).join(', ');
@@ -159,7 +159,6 @@ export function init(component, data) {
     //updateComponent(component, data)
 
     effect(() => {
-        //console.log(data)
         updateComponent(component, data)
     })
 }
@@ -232,6 +231,7 @@ function bindAttribute(component, el, directive) {
 }
 
 function updateComponent(component, data) {
+
   for (const variableName in data) {
     const foundBinds = bindings[component][variableName];
     if (!foundBinds) continue;
@@ -251,7 +251,6 @@ function updateComponent(component, data) {
         // Only update if value changed
         if (prevValue !== currentValue) {
           el._prevValues[foundDirective] = currentValue;
-          
           updateElement(el, foundDirective, currentValue, data);
         }
       }
@@ -315,8 +314,6 @@ function updateElement(el, directive, value, data) {
                         contextValue = getPropByPath(context, argPath);
                     } 
 
-                    console.log('cv', context, argPath)
-
                     if (typeof fn === 'function') {
                         newElement.addEventListener('mouseover', () => fn(contextValue));
                     }
@@ -360,6 +357,9 @@ function updateElement(el, directive, value, data) {
     if(directive === 'v-on:click') {
         el.addEventListener('click', value)
     }
+    if(directive === 'v-on:submit') {
+        el.addEventListener('submit', value)
+    }
     if(directive === 'v-on:mouseover') {
         el.addEventListener('mouseover', value)
     }
@@ -390,7 +390,21 @@ function updateElement(el, directive, value, data) {
         }
     }
     if (directive === 'v-component') {
+        const parent = el.parentNode
+
         el.replaceWith(value);
+        Array.from(el.attributes).forEach(attr => {
+            
+            if (attr.name.startsWith('@')) {
+                const eventName = attr.name.slice(1); // e.g. 'add-to-cart'
+                const handlerName = attr.value;       // e.g. 'updateCart'
+                const handlerFn = data[handlerName];
+                if (typeof handlerFn === 'function') {
+                    
+                    value.addEventListener(eventName, handlerFn);
+                }
+            }
+        });
     }
 }
 
@@ -407,3 +421,24 @@ function interpolate(str, context) {
   });
 }
 
+export function defineEmits(eventNames = [], currentComponentName = null) {
+  return function emit(eventName, payload) {
+    if (!eventNames.includes(eventName)) {
+      console.warn(`Event "${eventName}" is not defined in emits.`);
+      return;
+    }
+    const currentComponent = currentComponents[currentComponentName] ?? false;
+
+    // Dispatch a CustomEvent on the root element or component root
+    if (currentComponent) {
+        
+
+      const event = new CustomEvent(eventName, {
+        detail: payload,
+        bubbles: true,
+        composed: true,
+      });
+      currentComponent.dispatchEvent(event);
+    }
+  };
+}

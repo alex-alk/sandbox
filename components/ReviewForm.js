@@ -1,13 +1,7 @@
-import {
-  defineEmits,
-  getState,
-  ref,
-  watchEffect,
-  addEvent
-} from "../main.js";
+import { ref, init, computed, defineEmits } from '../main.js'
 
 export default function ReviewForm() {
-  const templ = `
+  const html= `
     <form class="review-form" v-on:submit="onSubmit">
       <h3>Leave a review</h3>
 
@@ -30,71 +24,42 @@ export default function ReviewForm() {
       <input class="button" type="submit" value="Submit">
     </form>`;
 
-  const templateEl = document.createElement('template');
-  templateEl.innerHTML = templ.trim();
-  const component = templateEl.content;
-  const root = component.firstElementChild;
+const emit = defineEmits(['review-submitted'], 'ReviewForm')
 
-  // Reactive state
-  const review = getState({
-    name: ref(''),
-    content: ref(''),
-    rating: ref(null)
-  });
+const review = {
+  name: '',
+  content: '',
+  rating: null
+}
 
-  // Emit setup
-  const emit = defineEmits(['review-submitted'], root);
+const onSubmit = (e) => {
+    e.preventDefault()
 
-  // Form submit
-  function onSubmit(e) {
-    e.preventDefault();
-
-    if (!review.name || !review.content || !review.rating) {
-      alert('Please fill out all fields.');
-      return;
-    }
+    // if (review.name === '' || review.content === '' || review.rating === null) {
+    //   alert('Review is incomplete. Please fill out every field.')
+    //   return
+    // }
 
     const productReview = {
       name: review.name,
       content: review.content,
       rating: review.rating
-    };
+    }
+    
+    emit('review-submitted', productReview)
 
-    emit('review-submitted', productReview);
+    review.name = ''
+    review.content = ''
+    review.rating = null
+}
 
-    // Reset fields
-    review.name = '';
-    review.content = '';
-    review.rating = null;
-  }
+const template = document.createElement('template')
+template.innerHTML = html
+const component = template.content
 
-  const methods = { onSubmit };
-  addEvent('submit', methods, component);
-
-  // Bind inputs manually (v-model behavior)
-  const nameInput = component.querySelector('#name');
-  const contentInput = component.querySelector('#review');
-  const ratingInput = component.querySelector('#rating');
-
-  // Input listeners to update state
-  nameInput.addEventListener('input', e => {
-    review.name = e.target.value;
-  });
-
-  contentInput.addEventListener('input', e => {
-    review.content = e.target.value;
-  });
-
-  ratingInput.addEventListener('change', e => {
-    review.rating = Number(e.target.value);
-  });
-
-  // Watch state and update DOM inputs (in case state changes programmatically)
-  watchEffect(() => {
-    if (nameInput.value !== review.name) nameInput.value = review.name;
-    if (contentInput.value !== review.content) contentInput.value = review.content;
-    if (ratingInput.value !== String(review.rating)) ratingInput.value = review.rating || '';
-  });
+init(component, {
+    onSubmit
+},'ReviewForm')
 
   return component;
 }

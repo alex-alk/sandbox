@@ -1,7 +1,9 @@
 
-import {ref, init, computed} from '../main.js'
+import { ref, init, computed, defineEmits } from '../main.js'
+import reviewFormF from './ReviewForm.js';
+import reviewListF from './ReviewList.js';
 
-export default function ProductDisplay(text = {}) {
+export default function ProductDisplay(premium = {}) {
 
 const html = `
 
@@ -14,6 +16,7 @@ const html = `
         <h1 v-text="title">{{ title }}</h1>
         <p v-if="inStock">In Stock</p>
         <p v-else>Out of Stock</p>
+        <p v-text="shipping">Shipping: {{ shipping }}</p>
         <ul>
           <li v-for="detail in details">{{ detail }}</li>
         </ul>
@@ -33,6 +36,8 @@ const html = `
         </button>
       </div>
     </div>
+    <template v-component="reviewList"></template>
+    <template v-component="reviewForm" @review-submitted="addReview"></template
   </div>`
 
 const socksGreenImage = './assets/images/socks_green.jpeg';
@@ -44,8 +49,11 @@ const variants = ref([
   { id: 2235, color: 'blue' , image: socksBlueImage, quantity: 0},
 ])
 
+const emit = defineEmits(['add-to-cart'], 'index')
+
 const addToCart = () => {
-    cart.value += 1
+    console.log('add-to-cart')
+    emit('add-to-cart', variants.value[selectedVariant.value].id)
 }
 
 const selectedVariant = ref(0)
@@ -68,7 +76,14 @@ const inStock = computed(() => {
   return variants.value[selectedVariant.value].quantity > 0
 })
 
-
+const shipping = computed(() => {
+  if (premium) {
+    return 'Free'
+  }
+  else {
+    return 2.99
+  }
+})
 
 const buttonClass = computed(() => ({
   disabledButton: !inStock.value
@@ -76,8 +91,15 @@ const buttonClass = computed(() => ({
 
 const inStockComputed = computed(() => !inStock.value)
 
+const reviewForm = reviewFormF()
 
+const reviews = ref([])
 
+const reviewList = reviewListF(reviews)
+
+const addReview = (review) => {
+    reviews.value.push(review)
+}
 
 
 const template = document.createElement('template')
@@ -85,7 +107,9 @@ template.innerHTML = html
 const component = template.content
 
 init(component, {
+  addReview,
     updateVariant,
+    shipping,
   title, 
   selectedVariant, 
   product, image, 
@@ -93,7 +117,10 @@ init(component, {
   details, variants, 
   addToCart, 
   buttonClass, 
-  inStockComputed})
+  inStockComputed,
+  reviewForm,
+  reviewList
+}, 'ProductDisplay')
 
 return component;
 
