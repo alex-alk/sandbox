@@ -13,32 +13,28 @@
 
 <script type="module">
 import { ref, init, computed } from './main.js'
-import productDisplayF from './components/ProductDisplay.js'
 
 const content = `
 <div class="nav-bar"></div>
-<div class="cart" v-text="cart">Cart({{ cart }})</div>
-<template v-component="productDisplay" @add-to-cart="updateCart">`
+<li v-for="item in list" class="a"></li>
+`
 
-const cart = ref(0)
-const premium = ref(true)
+const list = ref([
+    {id: 1, name: 'primul'},
+    {id: 1, name: 'al doilea'},
+    {id: 1, name: 'al treilea'}
+])
 
-const cartEls = []
-const updateCart = (id) => {
-  cartEls.push(id)
-  cart.value = cartEls.length
-}
+// todo: de facut lista sa fie dinamica 
+setInterval(() => {
 
+}, 1000)
 
-
-const productDisplay = productDisplayF(premium)
 
 
 const app = document.getElementById('app');
 app.innerHTML = content.trim()
-
-init(app, {cart, premium, productDisplay, updateCart}, 'index')
-
+init(app, { list }, 'index')
 
 </script>
 </body>
