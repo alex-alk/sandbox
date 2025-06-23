@@ -16,19 +16,23 @@ import { ref, init, computed } from './main.js'
 
 const content = `
 <div class="nav-bar"></div>
-<li v-for="item in list" class="a"></li>
+<ul>
+<li v-for="item in list" class="a" v-bind:key="item.id">{{ item.name }}</li></ul>
 `
 
 const list = ref([
     {id: 1, name: 'primul'},
-    {id: 1, name: 'al doilea'},
-    {id: 1, name: 'al treilea'}
+    {id: 2, name: 'al doilea'},
+    {id: 3, name: 'al treilea'}
 ])
 
-// todo: de facut lista sa fie dinamica 
+// todo: adaugat acum
 setInterval(() => {
+  //console.log(list.value)
+  list.value.pop()
+  
 
-}, 1000)
+}, 2000)
 
 
 

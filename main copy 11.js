@@ -110,6 +110,27 @@ export function computed(getter) {
     }
 }
 
+export function ref_(initialValue) {
+    let _value = initialValue;
+    const subscribers = new Set();
+
+    return {
+        get value() {
+            return _value;
+        },
+        set value(newVal) {
+            if (_value !== newVal) {
+                _value = newVal;
+                // Notify all subscribers about the change
+                subscribers.forEach(fn => fn());
+            }
+        },
+        subscribe(fn) {
+            subscribers.add(fn);
+        }
+    };
+}
+
 let currentComponents = []
 const bindings = {}
 export function init(component, data, cname) {
@@ -137,19 +158,18 @@ export function init(component, data, cname) {
         }
     })
 
-    effect(() => {
-        for (const key in data) {
-            const val = data[key];
-            if (val && typeof val === 'object' && 'value' in val) {
-                // access the ref
-                const arr = val.value;
-                // if array, access its length
-                if (Array.isArray(arr)) arr.length;
-            }
-        }
-
-        updateComponent(component, data);
-    });
+     effect(() => {
+    for (const key in data) {
+      const val = data[key];
+      if (val && typeof val === 'object' && 'value' in val) {
+        // access the ref
+        const arr = val.value;
+        // if array, access its length
+        if (Array.isArray(arr)) arr.length;
+      }
+    }
+    updateComponent(component, data);
+  });
 }
 
 
@@ -259,6 +279,11 @@ function updateComponent(component, data) {
       ? data[variableName].value
       : data[variableName];
 
+    if (Array.isArray(currentValue)) {
+    // Access length to ensure reactivity triggers on mutations
+        currentValue.length;
+    }
+
         for (const foundDot in foundBinds) {
                 
             const foundDirectives = bindings[component][variableName][foundDot]
@@ -295,92 +320,241 @@ function updateComponent(component, data) {
 
 function updateElement(el, directive, value, data) {
 
-
-    if (directive === 'v-for') {
-        const attribute = el.getAttribute('v-for');
-        const [left, right] = attribute.split(' in ').map(s => s.trim());
-
-        let itemVar = left;
-        let indexVar = null;
-        const match = left.match(/^\(\s*([^,\s]+)\s*,\s*([^,\s]+)\s*\)$/);
-        if (match) {
-            itemVar = match[1];
-            indexVar = match[2];
-        }
-
-        // Get the array from data (unwrapping refs if necessary)
-        let list = getPropByPath(data, right);
-        if (list && list.value !== undefined) {
-            list = list.value; // unwrap ref if needed
-        }
-
-        // Save original template HTML if not already saved
-        if (!el.dataset.template) {
-            el.dataset.template = el.innerHTML;
-        }
-
-
-        const parent = el.parentNode
-
-        const liChildren = Array.from(parent.children).filter(child => child.tagName === 'LI');
-        
-        const key = el.getAttribute('v-bind:key')
-        // todo: se face hidden
-        // daca exista doar un element, creeaza tot
-
-        if (liChildren.length === 1) {
-        
-            list.forEach((item, index) => {
-                // if there is only one element and does not have v-bind:key, clone and remove
-                let clone = el.cloneNode(true)
-
-                const context = Object.create(data);
-
-                    context[itemVar] = item;
-                    if (indexVar !== null) {
-                        context[indexVar] = index;
-                    }
-                    
-                    const [leftv, rightv] = key.split('.')
-                    const elid = context[leftv][rightv];
-                    clone.dataset.key = elid
-                    
-
-                    // Reset content from template
-                    clone.innerHTML = el.dataset.template;
-
-                    // Interpolate {{}} bindings
-                    interpolateMustache(clone, context);
-                    // ✅ Correct insertion order
-                    el.insertAdjacentElement('beforebegin', clone);
-            });
-        } else {
-            // ia elementele care au data-key si compara
-            const liChildren = Array.from(parent.children).filter(child => child.dataset.key);
-            
-            console.log('---------begin-------------')
-
-            const listIndexed = []
-            list.forEach((item, index) => {
-                console.log('item', item)
-                listIndexed[item['id']] = item['id']
-            })
-            console.log(listIndexed)
-
-            for (const liChild of liChildren) {
-                const liId = liChild.dataset.key
-                // if liId not in data, remove it
-
-                console.log(liId, liChildren)
-                console.log(liId in listIndexed)
-                if(!(liId in listIndexed)) {
-                    liChild.remove()
-                }
-            }
-            console.log('-----------end------------')
+    if (directive === 'v-bind:src') {
+        el.src = value
+    }
+    if (directive === 'v-if') {
+        el.style.display = value ? '' : 'none'
+        const next = el.nextElementSibling
+        if (next?.hasAttribute('v-else')) {
+            next.style.display = value ? 'none' : ''
         }
     }
 
+
+
+    if (directive === 'v-for') {
+    const attribute = el.getAttribute('v-for');
+    const [left, right] = attribute.split(' in ').map(s => s.trim());
+
+    let itemVar = left;
+    let indexVar = null;
+    const match = left.match(/^\(\s*([^,\s]+)\s*,\s*([^,\s]+)\s*\)$/);
+    if (match) {
+        itemVar = match[1];
+        indexVar = match[2];
+    }
+
+    // Get the array from data (unwrapping refs if necessary)
+    let list = getPropByPath(data, right);
+    if (list && list.value !== undefined) {
+        list = list.value; // unwrap ref if needed
+    }
+
+    if (!Array.isArray(list)) {
+        console.warn('v-for expects an array value but got:', list);
+        return;
+    }
+
+    // Remove previously rendered v-for items
+    let nextSibling = el.nextElementSibling;
+    while (nextSibling && nextSibling.hasAttribute('data-v-for-item')) {
+        const toRemove = nextSibling;
+        nextSibling = nextSibling.nextElementSibling;
+        toRemove.remove();
+    }
+
+    // Save original template HTML if not already saved
+    if (!el.dataset.template) {
+        el.dataset.template = el.innerHTML;
+    }
+
+    // Hide the original element template
+    //el.style.display = 'none';
+
+    // Track where to insert the next item
+    //let insertAfterEl = el;
+
+    list.forEach((item, index) => {
+        const clone = el.cloneNode(true);
+
+        // Build context inheriting data + item vars
+        const context = Object.create(data);
+        context[itemVar] = item;
+        if (indexVar !== null) {
+            context[indexVar] = index;
+        }
+
+        // Reset content from template
+        clone.innerHTML = el.dataset.template;
+
+        // Interpolate {{}} bindings
+        interpolateMustache(clone, context);
+
+        // Handle v-on:mouseover if present
+        const onMouseover = clone.getAttribute('v-on:mouseover');
+        if (onMouseover) {
+            const fnMatch = onMouseover.match(/^(\w+)\(([\w.]+)\)$/);
+            if (fnMatch) {
+                const fnName = fnMatch[1];
+                const argPath = fnMatch[2];
+                const fn = data[fnName];
+                const argValue = (argPath === indexVar) ? index : context[argPath];
+                if (typeof fn === 'function') {
+                    clone.addEventListener('mouseover', () => fn(argValue));
+                }
+            }
+        }
+
+        // Handle v-bind:style if present
+        const styleBinding = clone.getAttribute('v-bind:style');
+        if (styleBinding) {
+            const styleObject = new Function('with(this) { return ' + styleBinding + '; }').call(context);
+            updateElement(clone, 'v-bind:style', styleObject, data);
+        }
+
+        // ✅ Correct insertion order
+        el.insertAdjacentElement('afterend', clone);
+        //insertAfterEl = newEl; // advance insert point
+    });
+}
+
+
+
+
+
+
+    if (directive === 'v-model') {
+    const modelAttr = el.getAttribute(directive);
+    const [modelPathRaw, ...modRaw] = modelAttr.split('.');
+    const modifiers = modRaw || [];
+    const pathParts = modelAttr.split('.');
+    const modelName = pathParts[0];
+
+
+    const getModelValue = () => getPropByPath(data, modelAttr);
+    const setModelValue = (val) => {
+        const path = pathParts.slice(1);
+        let obj = data[modelName];
+        if ('value' in obj) obj = obj.value; // unwrap ref
+        let target = obj;
+
+        for (let i = 0; i < path.length - 1; i++) {
+            if (!target[path[i]]) return;
+            target = target[path[i]];
+        }
+
+        const lastKey = path[path.length - 1];
+
+        if (path.length === 0) {
+            if ('value' in data[modelName]) {
+                data[modelName].value = val;
+            } else {
+                data[modelName] = val;
+            }
+        } else {
+            target[lastKey] = val;
+        }
+    };
+
+    const currentValue = getModelValue();
+
+    if (el.tagName === 'SELECT') {
+        el.value = currentValue;
+        el.addEventListener('change', (e) => {
+            let newVal = e.target.value;
+            if (modifiers.includes('number')) newVal = Number(newVal);
+            setModelValue(newVal);
+        });
+    } else if (el.type === 'checkbox') {
+        el.checked = currentValue;
+        el.addEventListener('change', (e) => {
+            setModelValue(e.target.checked);
+        });
+    } else {
+        el.value = currentValue;
+        el.addEventListener('input', (e) => {
+            let newVal = e.target.value;
+            if (modifiers.includes('number')) newVal = Number(newVal);
+            if (modifiers.includes('trim')) newVal = newVal.trim();
+            setModelValue(newVal);
+        });
+    }
+}
+
+
+    if (directive === 'v-text') {
+        
+        const variableNames = el.getAttribute(directive)
+
+        const constituentsCommaRaw = variableNames.split(',')
+        const constituentsComma = constituentsCommaRaw.map(cr => cr.trim())
+
+        const context = {}
+        for (const variableName of constituentsComma) {
+            context[variableName] = value
+        }
+
+        if (!el.dataset.template) {
+            el.dataset.template = el.textContent; // Save original with {{ }}
+        }
+        
+        const replacedText = interpolate(el.dataset.template, context)
+        el.textContent = replacedText
+    }
+
+    if(directive === 'v-on:click') {
+        el.addEventListener('click', value)
+    }
+    if(directive === 'v-on:submit') {
+        el.addEventListener('submit', value)
+    }
+    if(directive === 'v-on:mouseover') {
+        el.addEventListener('mouseover', value)
+    }
+    if (directive === 'v-bind:class') {
+        if (typeof value === 'object' && value !== null) {
+            for (const [className, condition] of Object.entries(value)) {
+            if (condition) {
+                el.classList.add(className);
+            } else {
+                el.classList.remove(className);
+            }
+            }
+        } else if (typeof value === 'string') {
+            el.className = value;
+        }
+    }
+
+    if (directive === 'v-bind:disabled') {
+        el.disabled = value
+    }
+    if (directive === 'v-bind:style') {
+        if (typeof value === 'object' && value !== null) {
+            for (const [styleName, styleValue] of Object.entries(value)) {
+            el.style[styleName] = styleValue;
+            }
+        } else if (typeof value === 'string') {
+            el.style.cssText = value;
+        }
+    }
+    if (directive === 'v-component') {
+        const parent = el.parentNode
+
+        el.replaceWith(value);
+        Array.from(el.attributes).forEach(attr => {
+            
+            if (attr.name.startsWith('@')) {
+                const eventName = attr.name.slice(1); // e.g. 'add-to-cart'
+                const handlerName = attr.value;       // e.g. 'updateCart'
+                const handlerFn = data[handlerName];
+                if (typeof handlerFn === 'function') {
+                    
+                    value.addEventListener(eventName, handlerFn);
+                }
+            }
+        });
+    }
 }
 
 function interpolateMustache(node, scope) {
