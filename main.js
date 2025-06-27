@@ -240,9 +240,9 @@ function hydrate(rootComponent, el, data) {
                     clone.removeAttribute('data-template')
 
                     context = {}
-                    context[left] = item;
+                    context[itemVar] = item;
                     if (indexVar !== null) {
-                        context[indexVar] = item.id;
+                        context[indexVar] = itemKey;
                     }
 
                     const replacedText = interpolate(el.dataset.template, context)
@@ -250,7 +250,7 @@ function hydrate(rootComponent, el, data) {
 
                     clone.setAttribute('v-bind:key', item.id ?? itemKey)
 
-                    const onMouseover = el.getAttribute('v-on:mouseover')
+                    const onMouseover = el.getAttribute('@mouseover')
                     if (onMouseover) {
                         // methodName(argument)
                         const fnMatch = onMouseover.match(/^(\w+)\(([\w.]+)\)$/);
@@ -269,11 +269,12 @@ function hydrate(rootComponent, el, data) {
                         // daca contine paranteze
                         // daca nu contine paranteze
 
-                        // console.log(data, vOnMouseOver, data[vOnMouseOver])
+
                         // clone.addEventListener('mouseover', data[vOnMouseOver])
                     }
 
                     const vStyle = el.getAttribute(':style') || el.getAttribute('v-bind:style');
+
                     if (vStyle) {
                         effect(() => {
                             // We assume vStyle is an object literal string like: "{ backgroundColor: variant.color }"
@@ -291,6 +292,7 @@ function hydrate(rootComponent, el, data) {
 
                             // 3. Split by commas for multiple styles (naive approach)
                             const styles = styleBody.split(',').map(s => s.trim()).filter(Boolean);
+                            
 
                             // 4. Build style object
                             const styleObj = {};
@@ -390,7 +392,6 @@ function getPropByPath(initialValue, path) {
 function interpolate(str, context) {
     return str.replace(/{{\s*([\w.]+)\s*}}/g, (match, path) => {
         // path is the expression, ex: item.name
-        //console.log('interpolate', context, path)
         const value = getPropByPath(context, path);
         return value !== undefined ? value : match;
     });
@@ -410,4 +411,12 @@ function parseClassBinding(str, context) {
   }
 
   return obj;
+}
+
+function computed(getter) {
+    return {
+        get value() {
+            return getter()
+        }
+    }
 }
