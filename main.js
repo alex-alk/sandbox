@@ -126,7 +126,7 @@ function init(rootComponent, data, cname) {
     rootComponents[cname] = rootComponent
 
     const directives = [
-        'v-for', 'v-text', 'v-bind:src', 'v-if'
+        'v-for', 'v-text', 'v-bind:src', 'v-if', 'v-on:click', ':class', 'v-bind:class', ':disabled'
     ]
 
     // build a comma separated selector
@@ -144,13 +144,67 @@ function init(rootComponent, data, cname) {
 
 function hydrate(rootComponent, el, data) {
     // get directives
-    const vFor = el.getAttribute('v-for');
-    if (!el.dataset.template) {
-        el.dataset.template = el.textContent; // Save original with {{ }}
+
+    const vClass = el.getAttribute(':class') || el.getAttribute('v-bind:class');
+
+    if (vClass) {
+        effect(() => {
+            const classObj = parseClassBinding(vClass, data);
+            for (const className in classObj) {
+                if (classObj[className]) {
+                    el.classList.add(className);
+                } else {
+                    el.classList.remove(className);
+                }
+            }
+        });
     }
 
+    const vDisabled = el.getAttribute(':disabled') || el.getAttribute('v-bind:disabled');
+    if (vDisabled) {
+        effect(() => {
+            let isNegated = false;
+            let path = vDisabled.trim();
+
+            // Handle negation
+            if (path.startsWith('!')) {
+                isNegated = true;
+                path = path.slice(1).trim();
+            }
+
+            // Support `ref` and `reactive` values
+            const reactiveValue = getPropByPath(data, path);
+            const actualValue = reactiveValue?.value !== undefined ? reactiveValue.value : reactiveValue;
+            const shouldDisable = isNegated ? !actualValue : !!actualValue;
+
+            // Apply or remove attribute
+            if (shouldDisable) {
+                el.setAttribute('disabled', '');
+            } else {
+                el.removeAttribute('disabled');
+            }
+        });
+    }
+
+    const vFor = el.getAttribute('v-for');
+
     if (vFor) {
+        const display = el.style.display;
+        if (!el.dataset.template) {
+            el.dataset.template = el.textContent; // Save original with {{ }}
+            el.style.display = 'none'
+        }
+
         const [left, right] = vFor.split(' in ').map(s => s.trim());
+        let itemVar = left;
+        let indexVar = null;
+
+        // (a, b)
+        const match = left.match(/^\(\s*([^,\s]+)\s*,\s*([^,\s]+)\s*\)$/);
+        if (match) {
+            itemVar = match[1];
+            indexVar = match[2];
+        }
 
         effect(() => {
             const dataToBind = data[right].value
@@ -174,21 +228,51 @@ function hydrate(rootComponent, el, data) {
                 }
             }
 
-            for (const item of dataToBind) {
-                if (!bindings[rootComponent][right]?.['v-for']?.[item.id]) {
+            // todo: sunt necesare aceste bindings?
+            for (const itemKey in dataToBind) {
+
+                const item = dataToBind[itemKey]
+                if (!bindings[rootComponent][right]?.['v-for']?.[item.id ?? itemKey]) {
 
                     const clone = el.cloneNode()
+                    clone.style.display = display
+                    clone.removeAttribute('data-template')
 
                     context = {}
                     context[left] = item;
-                    if (right !== null) {
-                        context[right] = item.id;
+                    if (indexVar !== null) {
+                        context[indexVar] = item.id;
                     }
 
                     const replacedText = interpolate(el.dataset.template, context)
                     clone.textContent = replacedText
 
-                    clone.setAttribute('v-bind:key', item.id)
+                    clone.setAttribute('v-bind:key', item.id ?? itemKey)
+
+                    const onMouseover = el.getAttribute('v-on:mouseover')
+                    if (onMouseover) {
+                        // methodName(argument)
+                        const fnMatch = onMouseover.match(/^(\w+)\(([\w.]+)\)$/);
+                        if (fnMatch) {
+                            const fnName = fnMatch[1];
+                            const argExpr = fnMatch[2];
+
+                            const fn = data[fnName];
+                            const argValue = getPropByPath(context, argExpr);
+
+                            if (typeof fn === 'function') {
+                                clone.addEventListener('mouseover', () => fn(argValue));
+                            }
+                        }
+
+                        // daca contine paranteze
+                        // daca nu contine paranteze
+
+                        // console.log(data, vOnMouseOver, data[vOnMouseOver])
+                        // clone.addEventListener('mouseover', data[vOnMouseOver])
+                    }
+
+
                     el.insertAdjacentElement('beforeBegin', clone)
 
                     bindings[rootComponent] ??= {};
@@ -208,11 +292,33 @@ function hydrate(rootComponent, el, data) {
         })
     }
 
+    const vClick = el.getAttribute('v-on:click');
+    if (vClick) {
+        effect(() => {
+            const dataToBind = data[vClick]
+            el.addEventListener('click', dataToBind)
+        })
+    }
+
     const vText = el.getAttribute('v-text');
     if (vText) {
         effect(() => {
+            
             const dataToBind = data[vText].value
-            el.textContent = dataToBind
+            
+            if (!el.dataset.template) {
+                el.dataset.template = el.textContent
+            }
+
+            context = {}
+            context[vText] = dataToBind;
+
+            // if (right !== null) {
+            //     context[right] = item.id;
+            // }
+
+            const replacedText = interpolate(el.dataset.template, context)
+            el.textContent = replacedText
         })
     }
 
@@ -247,7 +353,24 @@ function getPropByPath(initialValue, path) {
 function interpolate(str, context) {
     return str.replace(/{{\s*([\w.]+)\s*}}/g, (match, path) => {
         // path is the expression, ex: item.name
+        //console.log('interpolate', context, path)
         const value = getPropByPath(context, path);
         return value !== undefined ? value : match;
     });
+}
+
+function parseClassBinding(str, context) {
+  const obj = {};
+
+  const match = str.match(/^{\s*(\w+)\s*:\s*(!)?(\w+)\s*}$/);
+  if (match) {
+    const className = match[1];
+    const isNegated = !!match[2];
+    const variableName = match[3];
+
+    const value = context[variableName];
+    obj[className] = isNegated ? !value : !!value;
+  }
+
+  return obj;
 }
