@@ -365,7 +365,9 @@ function hydrate(rootComponent, el, data) {
 
     if (vIf) {
         effect(() => {
-            const dataToBind = data[vIf]
+            // todo: verificat daca e reactiv
+            const dataToBind = data[vIf].value ?? data[vIf]
+
             el.style.display = dataToBind ? '' : 'none'
             const next = el.nextElementSibling
 
