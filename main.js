@@ -1,438 +1,149 @@
-// reactive() converts the object deeply: nested objects are also wrapped with reactive() when accessed. 
-// It is also called by ref() internally when the ref value is an object.
-// Unlike a ref which wraps the inner value in a special object, reactive() makes an object itself reactive
-// it only works for object types
-
-const arrayMutations = ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'];
-
-export function reactive(obj) {
-  return new Proxy(obj, {
-    get(target, key) {
-      track(target, key);
-
-      if (Array.isArray(target) && arrayMutations.includes(key)) {
-        return function(...args) {
-          const result = Array.prototype[key].apply(target, args);
-          // trigger on length so effects tracking length will rerun
-          trigger(target, 'length');
-          trigger(target, key);
-          return result;
-        }
-      }
-      return Reflect.get(target, key);
-    },
-    set(target, key, value) {
-      const res = Reflect.set(target, key, value);
-      trigger(target, key);
-      return res;
-    }
-  });
-}
-
-export function ref(initialValue) {
-  // wrap initialValue in reactive if it's object/array
-  let _value = (initialValue != null && typeof initialValue === 'object')
-    ? reactive(initialValue)
-    : initialValue;
-
-  return {
-    get value() {
-      // track access to the ref itself
-      track(this, 'value');
-      // if it's an array, also track its length
-      if (Array.isArray(_value)) {
-        track(_value, 'length');
-      }
-      return _value;
-    },
-    set value(newVal) {
-      _value = (newVal != null && typeof newVal === 'object')
-        ? reactive(newVal)
-        : newVal;
-      trigger(this, 'value');
-    }
-  };
-}
-
-
 let activeEffect = null
+const targetMap = new WeakMap();
 
-export function effect(fn) {
-  const wrappedEffect = () => {
-    activeEffect = wrappedEffect;
-    fn();
-    activeEffect = null;
-  };
-  wrappedEffect(); // run once to register
+function effect(fn) {
+    activeEffect = fn
+    if (activeEffect) {
+        activeEffect()
+    }
+    activeEffect = null
 }
 
+// subscribe add
+// This will be set right before an effect is about
+// to be run
 function track(target, key) {
     if (activeEffect) {
         const effects = getSubscribersForProperty(target, key)
         effects.add(activeEffect)
-    } else {
-        return
     }
 }
 
-// Effect subscriptions are stored in a global WeakMap<target, Map<key, Set<effect>>> data structure. 
-// If no subscribing effects Set was found for a property (tracked for the first time), 
-// it will be created. 
-
-const targetMap = new WeakMap();
-
 function getSubscribersForProperty(target, key) {
-  let depsMap = targetMap.get(target);
-  if (!depsMap) {
-    depsMap = new Map();
-    targetMap.set(target, depsMap);
-  }
+    let depsMap = targetMap.get(target);
 
-  let deps = depsMap.get(key);
-  if (!deps) {
-    deps = new Set();
-    depsMap.set(key, deps);
-  }
+    if (!depsMap) {
+        depsMap = new Map();
+        targetMap.set(target, depsMap);
+    }
+
+    let deps = depsMap.get(key);
+
+    if (!deps) {
+        deps = new Set();
+        depsMap.set(key, deps);
+    }
 
   return deps;
 }
 
+// notify
 function trigger(target, key) {
     const effects = getSubscribersForProperty(target, key)
-    effects.forEach((effect) => effect())
+    effects.forEach(effect => effect())
 }
 
-export function computed(getter) {
+function reactive(obj) {
+    let objProxy = new Proxy(obj, {
+        get(target, key, receiver) {
+            const result = Reflect.get(target, key, receiver)
+            track(target, key)
+            return result
+        },
+        set(target, key, value, receiver) {
+            Reflect.set(target, key, value, receiver)
+            trigger(target, key)
+            return true
+        }
+    })
+    return objProxy
+}
+
+function ref(initialValue) {
+    let value = (initialValue != null && typeof initialValue === 'object') ? 
+        reactive(initialValue) : initialValue;
+
     return {
         get value() {
-            return getter()
+            track(this, 'value');
+            return value;
+        },
+        set value(newVal) {
+            value = (newVal != null && typeof newVal === 'object') ? 
+                reactive(newVal) : newVal;
+            trigger(this, 'value');
         }
-    }
+    };
 }
 
-let currentComponents = []
-const bindings = {}
-export function init(component, data, cname) {
-    currentComponents[cname] = component
+// ------------------------- init ---------------------------------
 
-    // ✅ Store refs (data) on the component itself
-    component._bindings = data  // this ensures the refs are preserved and shared
+let rootComponents = []
+const bindings = {}
+function init(rootComponent, data, cname) {
+    rootComponents[cname] = rootComponent
 
     const directives = [
-        'v-text', 'v-component', 'v-bind:src',
-        'v-if', 'v-for', 'v-on:click', 'v-on:mouseover',
-        'v-bind:class', 'v-bind:disabled', 'v-on:submit', 'v-model'
+        'v-for', 'v-text'
     ]
 
+    // build a comma separated selector
     const selector = directives.map(d => `[${d.replace(':', '\\:')}]`).join(', ')
-    const elements = component.querySelectorAll(selector)
+    const elements = rootComponent.querySelectorAll(selector)
 
-    if (!bindings[component]) {
-        bindings[component] = []
+    if (!bindings[rootComponent]) {
+        bindings[rootComponent] = []
     }
 
-    elements.forEach(el => {
-        for (const directive of directives) {
-            bindAttribute(component, el, directive)
-        }
-    })
-
-    effect(() => {
-        for (const key in data) {
-            const val = data[key];
-            if (val && typeof val === 'object' && 'value' in val) {
-                // access the ref
-                const arr = val.value;
-                // if array, access its length
-                if (Array.isArray(arr)) arr.length;
-            }
-        }
-
-        updateComponent(component, data);
-    });
-}
-
-
-function bindAttribute(component, el, directive) {
-    let refName = el.getAttribute(directive);
-
-    if (refName) {
-
-        const constituentsRaw = refName.split(' in ')
-        const constituents = constituentsRaw.map(cr => cr.trim())
-
-        const constituentsCommaRaw = refName.split(',')
-        const constituentsComma = constituentsCommaRaw.map(cr => cr.trim())
-
-        const constituentsDotRaw = refName.split('.')
-        const constituentsDot = constituentsDotRaw.map(cr => cr.trim())
-
-        if (constituents.length > 1) {
-            refName = constituents[1]
-            if (!bindings[component][refName]) {
-                bindings[component][refName] = []
-            }
-            if (!bindings[component][refName][0]) {
-                bindings[component][refName][0] = []
-            }
-            if (!bindings[component][refName][0][directive]) {
-                bindings[component][refName][0][directive] = []
-            }
-            bindings[component][refName][0][directive].push(el)
-        } else if(constituentsComma.length > 1) {
-            for (const refNameConst of constituentsComma) {
-                if (!bindings[component][refNameConst]) {
-                    bindings[component][refNameConst] = []
-                }
-                if (!bindings[component][refNameConst][0]) {
-                    bindings[component][refNameConst][0] = []
-                }
-                if (!bindings[component][refNameConst][0][directive]) {
-                    bindings[component][refNameConst][0][directive] = []
-                }
-                bindings[component][refNameConst][0][directive].push(el)
-            }
-        } else if(constituentsDot.length === 2) {
-            const refNameConst = constituentsDot[0]
-            const refNameDot = constituentsDot[1]
-            if (!bindings[component][refNameConst]) {
-                bindings[component][refNameConst] = []
-            }
-            if (!bindings[component][refNameConst][refNameDot]) {
-                bindings[component][refNameConst][refNameDot] = []
-            }
-            if (!bindings[component][refNameConst][refNameDot][directive]) {
-                bindings[component][refNameConst][refNameDot][directive] = []
-            }
-            bindings[component][refNameConst][refNameDot][directive].push(el)
-        }
-         else {
-            if (!bindings[component][refName]) {
-                bindings[component][refName] = []
-            }
-
-            if (!bindings[component][refName][0]) {
-                bindings[component][refName][0]= []
-            }
-            if (!bindings[component][refName][0][directive]) {
-                bindings[component][refName][0][directive] = []
-            }
-            bindings[component][refName][0][directive].push(el)
-        }
-        
-        // if (constituentsComma.length > 1) {
-        //     for (const refNameConst of constituentsComma) {
-        //         if (!bindings[component][refNameConst]) {
-        //             bindings[component][refNameConst] = []
-        //         }
-        //         if (!bindings[component][refNameConst][directive]) {
-        //             bindings[component][refNameConst][directive] = []
-        //         }
-        //         bindings[component][refNameConst][directive].push(el)
-        //     }
-        // } else {
-
-        //     if (constituents.length > 1) {
-        //         refName = constituents[1]
-        //     }
-
-        //     if (!bindings[component][refName]) {
-        //         bindings[component][refName] = []
-        //     }
-        //     if (!bindings[component][refName][directive]) {
-        //         bindings[component][refName][directive] = []
-        //     }
-        //     bindings[component][refName][directive].push(el)
-        // }
+    for (const el of elements) {
+        hydrate(rootComponent, el, data)
     }
 }
 
-function updateComponent(component, data) {
+function hydrate(rootComponent, el, data) {
+    // get directives
+    const vFor = el.getAttribute('v-for');
+    if (vFor) {
+        const [left, right] = vFor.split(' in ').map(s => s.trim());
 
-  for (const variableName in data) {
+        effect(() => {
+            const dataToBind = data[right].value
 
+            let dataToBindIndexed = []
+            for (const dataItem of dataToBind) {
+                dataToBindIndexed[dataItem.id] = dataItem
+            }
 
-    const foundBinds = bindings[component][variableName];
-    if (!foundBinds) continue;
-
-    const currentValue = 'value' in data[variableName]
-      ? data[variableName].value
-      : data[variableName];
-
-        for (const foundDot in foundBinds) {
-                
-            const foundDirectives = bindings[component][variableName][foundDot]
+            const vFors = bindings[rootComponent][right]?.['v-for'];
             
-            for (const foundDirective in foundDirectives) {
-                const els = bindings[component][variableName][foundDot][foundDirective];
-
-                
-                for (const el of els) {
-                    // Initialize previous value store
-                    el._prevValues ??= {};
-                    if (foundDirective === 'v-for') {
-                        const prevLen = el._prevValues['v-for.length'] ?? 0;
-                        const currLen = Array.isArray(currentValue) ? currentValue.length : 0;
-
-                        if (prevLen !== currLen) {
-                            el._prevValues['v-for.length'] = currLen;
-                            updateElement(el, 'v-for', currentValue, data);
-                        }
-                        } else {
-                        // everything else: compare raw values
-                        const prevVal = el._prevValues[foundDirective];
-                        if (prevVal !== currentValue) {
-                            el._prevValues[foundDirective] = currentValue;
-                            updateElement(el, foundDirective, currentValue, data);
+            if (vFors) {
+                for (const elId of Object.keys(vFors)) {
+                    if (!(elId in dataToBindIndexed)) {
+                        const elem = bindings[rootComponent][right]['v-for'][elId]
+                        if (elem.getAttribute('v-bind:key') !== 'item.id') {
+                            elem.remove()
+                            delete bindings[rootComponent][right]['v-for'][elId]
                         }
                     }
                 }
             }
-        }
-    
-    }
-}
 
-function updateElement(el, directive, value, data) {
+            for (const item of dataToBind) {
+                if (!bindings[rootComponent][right]?.['v-for']?.[item.id]) {
 
-
-    if (directive === 'v-for') {
-        const attribute = el.getAttribute('v-for');
-        const [left, right] = attribute.split(' in ').map(s => s.trim());
-
-        let itemVar = left;
-        let indexVar = null;
-        const match = left.match(/^\(\s*([^,\s]+)\s*,\s*([^,\s]+)\s*\)$/);
-        if (match) {
-            itemVar = match[1];
-            indexVar = match[2];
-        }
-
-        // Get the array from data (unwrapping refs if necessary)
-        let list = getPropByPath(data, right);
-        if (list && list.value !== undefined) {
-            list = list.value; // unwrap ref if needed
-        }
-
-        // Save original template HTML if not already saved
-        if (!el.dataset.template) {
-            el.dataset.template = el.innerHTML;
-        }
-
-
-        const parent = el.parentNode
-
-        const liChildren = Array.from(parent.children).filter(child => child.tagName === 'LI');
-        
-        const key = el.getAttribute('v-bind:key')
-        // todo: se face hidden
-        // daca exista doar un element, creeaza tot
-
-        if (liChildren.length === 1) {
-        
-            list.forEach((item, index) => {
-                // if there is only one element and does not have v-bind:key, clone and remove
-                let clone = el.cloneNode(true)
-
-                const context = Object.create(data);
-
-                    context[itemVar] = item;
-                    if (indexVar !== null) {
-                        context[indexVar] = index;
-                    }
+                    const clone = el.cloneNode()
                     
-                    const [leftv, rightv] = key.split('.')
-                    const elid = context[leftv][rightv];
-                    clone.dataset.key = elid
-                    
+                    clone.textContent = item.name
+                    clone.setAttribute('v-bind:key', item.id)
+                    el.insertAdjacentElement('beforeBegin', clone)
 
-                    // Reset content from template
-                    clone.innerHTML = el.dataset.template;
-
-                    // Interpolate {{}} bindings
-                    interpolateMustache(clone, context);
-                    // ✅ Correct insertion order
-                    el.insertAdjacentElement('beforebegin', clone);
-            });
-        } else {
-            // ia elementele care au data-key si compara
-            const liChildren = Array.from(parent.children).filter(child => child.dataset.key);
-            
-            console.log('---------begin-------------')
-
-            const listIndexed = []
-            list.forEach((item, index) => {
-                console.log('item', item)
-                listIndexed[item['id']] = item['id']
-            })
-            console.log(listIndexed)
-
-            for (const liChild of liChildren) {
-                const liId = liChild.dataset.key
-                // if liId not in data, remove it
-
-                console.log(liId, liChildren)
-                console.log(liId in listIndexed)
-                if(!(liId in listIndexed)) {
-                    liChild.remove()
+                    bindings[rootComponent] ??= {};
+                    bindings[rootComponent][right] ??= {};
+                    bindings[rootComponent][right]['v-for'] ??= {};
+                    bindings[rootComponent][right]['v-for'][item.id] = el;
                 }
             }
-            console.log('-----------end------------')
-        }
+        })
+
     }
-
-}
-
-function interpolateMustache(node, scope) {
-  if (node.nodeType === Node.TEXT_NODE) {
-    const mustacheRE = /{{\s*(.+?)\s*}}/g
-    node.textContent = node.textContent.replace(mustacheRE, (_, expr) => {
-      try {
-        // Create a function with the expression and evaluate it in scope
-        // Use `with` for scope context (simplified example)
-        return new Function('with(this) { return ' + expr + ' }').call(scope)
-      } catch (e) {
-        console.error('Failed to evaluate mustache expression:', expr, e)
-        return ''
-      }
-    })
-  } else if (node.nodeType === Node.ELEMENT_NODE) {
-    node.childNodes.forEach(child => interpolateMustache(child, scope))
-  }
-}
-
-
-function getPropByPath(obj, path) {
-  return path.split('.').reduce((acc, part) => {
-    return acc && acc[part] !== undefined ? acc[part] : undefined;
-  }, obj);
-}
-
-function interpolate(str, context) {
-  return str.replace(/{{\s*([\w.]+)\s*}}/g, (match, path) => {
-    const value = getPropByPath(context, path);
-    return value !== undefined ? value : match;
-  });
-}
-
-export function defineEmits(eventNames = [], currentComponentName = null) {
-  return function emit(eventName, payload) {
-    if (!eventNames.includes(eventName)) {
-      console.warn(`Event "${eventName}" is not defined in emits.`);
-      return;
-    }
-    const currentComponent = currentComponents[currentComponentName] ?? false;
-
-    // Dispatch a CustomEvent on the root element or component root
-    if (currentComponent) {
-        
-
-      const event = new CustomEvent(eventName, {
-        detail: payload,
-        bubbles: true,
-        composed: true,
-      });
-      currentComponent.dispatchEvent(event);
-    }
-  };
 }

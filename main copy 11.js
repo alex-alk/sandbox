@@ -159,16 +159,16 @@ export function init(component, data, cname) {
     })
 
      effect(() => {
-    for (const key in data) {
-      const val = data[key];
-      if (val && typeof val === 'object' && 'value' in val) {
-        // access the ref
-        const arr = val.value;
-        // if array, access its length
-        if (Array.isArray(arr)) arr.length;
-      }
-    }
-    updateComponent(component, data);
+        for (const key in data) {
+            const val = data[key];
+            if (val && typeof val === 'object' && 'value' in val) {
+                // access the ref
+                const arr = val.value;
+                // if array, access its length
+                if (Array.isArray(arr)) arr.length;
+            }
+        }
+        updateComponent(component, data);
   });
 }
 
