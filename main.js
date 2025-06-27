@@ -126,7 +126,8 @@ function init(rootComponent, data, cname) {
     rootComponents[cname] = rootComponent
 
     const directives = [
-        'v-for', 'v-text', 'v-bind:src', 'v-if', 'v-on:click', ':class', 'v-bind:class', ':disabled'
+        'v-for', 'v-text', 'v-bind:src', 'v-if', 'v-on:click', ':class', 'v-bind:class', ':disabled',
+        ':style'
     ]
 
     // build a comma separated selector
@@ -270,6 +271,42 @@ function hydrate(rootComponent, el, data) {
 
                         // console.log(data, vOnMouseOver, data[vOnMouseOver])
                         // clone.addEventListener('mouseover', data[vOnMouseOver])
+                    }
+
+                    const vStyle = el.getAttribute(':style') || el.getAttribute('v-bind:style');
+                    if (vStyle) {
+                        effect(() => {
+                            // We assume vStyle is an object literal string like: "{ backgroundColor: variant.color }"
+                            // Parse it safely:
+                            
+                            // 1. Remove outer curly braces and whitespace
+                            const objLiteral = vStyle.trim();
+                            if (!objLiteral.startsWith('{') || !objLiteral.endsWith('}')) {
+                                console.warn('Only simple object literals are supported in :style');
+                                return;
+                            }
+
+                            // 2. Extract inside of { ... }
+                            const styleBody = objLiteral.slice(1, -1).trim();
+
+                            // 3. Split by commas for multiple styles (naive approach)
+                            const styles = styleBody.split(',').map(s => s.trim()).filter(Boolean);
+
+                            // 4. Build style object
+                            const styleObj = {};
+                            for (const stylePair of styles) {
+                                const [key, valExpr] = stylePair.split(':').map(s => s.trim());
+                                if (!key || !valExpr) continue;
+
+                                // Use the correct context, not root data!
+                                const val = getPropByPath(context, valExpr);
+                                styleObj[key] = val?.value !== undefined ? val.value : val;
+                            }
+
+                            for (const [cssProp, cssVal] of Object.entries(styleObj)) {
+                                clone.style[cssProp] = cssVal ?? '';
+                            }
+                        });
                     }
 
 
