@@ -18,27 +18,33 @@
 
 const content = `
 <div class="nav-bar"></div>
-<p v-text="text"></p>
-<ul>
-<li v-for="item in list" class="a" v-bind:key="item.id">{{ item.name }}</li></ul>
+  <div class="product-display">
+    <div class="product-container">
+      <div class="product-image">    
+        <img v-bind:src="image">
+      </div>
+      <div class="product-info">
+        <h1 v-text="product">{{ product }}</h1>
+        <p v-if="inStock">In Stock</p>
+        <p v-else>Out of Stock</p>
+      </div>
+    </div>
+  </div>
 `
 
 
-const list = ref([
-    {id: 1, name: 'primul'},
-    {id: 2, name: 'al doilea'},
-    {id: 3, name: 'al treilea'}
-])
-const text = ref('init')
+const socksGreenImage = './assets/images/socks_green.jpeg'
 
-
+const product = ref('Socks')
+const image = ref(socksGreenImage)
+const inStock = true
 
 
 
 
 const app = document.getElementById('app');
 app.innerHTML = content.trim()
-init(app, { list, text }, 'index')
+init(app, { product, image, inStock }, 'index')
 
 </script>
 </body>

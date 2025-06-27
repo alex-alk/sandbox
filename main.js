@@ -59,22 +59,64 @@ function reactive(obj) {
     return objProxy
 }
 
-function ref(initialValue) {
-    let value = (initialValue != null && typeof initialValue === 'object') ? 
-        reactive(initialValue) : initialValue;
+class RefImpl {
+    constructor(initialValue) {
+        this._value = (initialValue != null && typeof initialValue === 'object') 
+            ? reactive(initialValue) 
+            : initialValue;
+    }
 
-    return {
-        get value() {
-            track(this, 'value');
-            return value;
-        },
-        set value(newVal) {
-            value = (newVal != null && typeof newVal === 'object') ? 
-                reactive(newVal) : newVal;
-            trigger(this, 'value');
-        }
-    };
+    get value() {
+        track(this, 'value');
+        return this._value;
+    }
+
+    set value(newVal) {
+        this._value = (newVal != null && typeof newVal === 'object') 
+            ? reactive(newVal) 
+            : newVal;
+        trigger(this, 'value');
+    }
 }
+
+function ref(val) {
+    return new RefImpl(val);
+}
+
+function isRef(val) {
+    return val instanceof RefImpl;
+}
+
+
+/*
+function isReactiveSource(val) {
+    return isRef(val) || isReactive(val);
+}
+
+const ReactiveFlag = Symbol('reactive');
+
+function reactive(obj) {
+    obj[ReactiveFlag] = true;
+
+    const proxy = new Proxy(obj, {
+        get(target, key, receiver) {
+            const result = Reflect.get(target, key, receiver)
+            track(target, key)
+            return result
+        },
+        set(target, key, value, receiver) {
+            Reflect.set(target, key, value, receiver)
+            trigger(target, key)
+            return true
+        }
+    });
+
+    return proxy;
+}
+    function isReactive(obj) {
+    return obj && obj[ReactiveFlag] === true;
+}
+*/
 
 // ------------------------- init ---------------------------------
 
@@ -84,7 +126,7 @@ function init(rootComponent, data, cname) {
     rootComponents[cname] = rootComponent
 
     const directives = [
-        'v-for', 'v-text'
+        'v-for', 'v-text', 'v-bind:src', 'v-if'
     ]
 
     // build a comma separated selector
@@ -92,7 +134,7 @@ function init(rootComponent, data, cname) {
     const elements = rootComponent.querySelectorAll(selector)
 
     if (!bindings[rootComponent]) {
-        bindings[rootComponent] = []
+        bindings[rootComponent] = {}
     }
 
     for (const el of elements) {
@@ -103,6 +145,10 @@ function init(rootComponent, data, cname) {
 function hydrate(rootComponent, el, data) {
     // get directives
     const vFor = el.getAttribute('v-for');
+    if (!el.dataset.template) {
+        el.dataset.template = el.textContent; // Save original with {{ }}
+    }
+
     if (vFor) {
         const [left, right] = vFor.split(' in ').map(s => s.trim());
 
@@ -132,8 +178,16 @@ function hydrate(rootComponent, el, data) {
                 if (!bindings[rootComponent][right]?.['v-for']?.[item.id]) {
 
                     const clone = el.cloneNode()
-                    
-                    clone.textContent = item.name
+
+                    context = {}
+                    context[left] = item;
+                    if (right !== null) {
+                        context[right] = item.id;
+                    }
+
+                    const replacedText = interpolate(el.dataset.template, context)
+                    clone.textContent = replacedText
+
                     clone.setAttribute('v-bind:key', item.id)
                     el.insertAdjacentElement('beforeBegin', clone)
 
@@ -144,6 +198,56 @@ function hydrate(rootComponent, el, data) {
                 }
             }
         })
+    }
+
+    const vSrc = el.getAttribute('v-bind:src');
+    if (vSrc) {
+        effect(() => {
+            const dataToBind = data[vSrc].value
+            el.src = dataToBind
+        })
+    }
+
+    const vText = el.getAttribute('v-text');
+    if (vText) {
+        effect(() => {
+            const dataToBind = data[vText].value
+            el.textContent = dataToBind
+        })
+    }
+
+    const vIf = el.getAttribute('v-if');
+
+    if (vIf) {
+        effect(() => {
+            const dataToBind = data[vIf]
+            el.style.display = dataToBind ? '' : 'none'
+            const next = el.nextElementSibling
+
+            if (next?.hasAttribute('v-else')) {
+                next.style.display = dataToBind ? 'none' : ''
+            }
+        })
 
     }
+}
+
+function getPropByPath(initialValue, path) {
+    const constituents = path.split('.')
+    const result = constituents.reduce(
+        (acc, part) => {
+            return acc && acc[part] !== undefined ? acc[part] : undefined;
+        }, 
+        initialValue
+    );
+    
+    return result
+}
+
+function interpolate(str, context) {
+    return str.replace(/{{\s*([\w.]+)\s*}}/g, (match, path) => {
+        // path is the expression, ex: item.name
+        const value = getPropByPath(context, path);
+        return value !== undefined ? value : match;
+    });
 }
