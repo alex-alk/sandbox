@@ -43,7 +43,7 @@ function trigger(target, key) {
     effects.forEach(effect => effect())
 }
 
-function reactive(obj) {
+export function reactive(obj) {
     let objProxy = new Proxy(obj, {
         get(target, key, receiver) {
             const result = Reflect.get(target, key, receiver)
@@ -79,7 +79,7 @@ class RefImpl {
     }
 }
 
-function ref(val) {
+export function ref(val) {
     return new RefImpl(val);
 }
 
@@ -122,12 +122,12 @@ function reactive(obj) {
 
 let rootComponents = []
 const bindings = {}
-function init(rootComponent, data, cname) {
+export function init(rootComponent, data, cname) {
     rootComponents[cname] = rootComponent
 
     const directives = [
         'v-for', 'v-text', 'v-bind:src', 'v-if', 'v-on:click', ':class', 'v-bind:class', ':disabled',
-        ':style'
+        ':style', 'v-component'
     ]
 
     // build a comma separated selector
@@ -145,6 +145,25 @@ function init(rootComponent, data, cname) {
 
 function hydrate(rootComponent, el, data) {
     // get directives
+
+    const vComponent = el.getAttribute('v-component');
+    if (vComponent) {
+        //const parent = el.parentNode
+
+        const component = data[vComponent]
+        el.replaceWith(component);
+        Array.from(el.attributes).forEach(attr => {
+            
+            if (attr.name.startsWith('@')) {
+                const eventName = attr.name.slice(1); // e.g. 'add-to-cart'
+                const handlerName = attr.value;       // e.g. 'updateCart'
+                const handlerFn = data[handlerName];
+                if (typeof handlerFn === 'function') {
+                    component.addEventListener(eventName, handlerFn);
+                }
+            }
+        });
+    }
 
     const vClass = el.getAttribute(':class') || el.getAttribute('v-bind:class');
 
@@ -239,7 +258,7 @@ function hydrate(rootComponent, el, data) {
                     clone.style.display = display
                     clone.removeAttribute('data-template')
 
-                    context = {}
+                    const context = {}
                     context[itemVar] = item;
                     if (indexVar !== null) {
                         context[indexVar] = itemKey;
@@ -349,7 +368,7 @@ function hydrate(rootComponent, el, data) {
                 el.dataset.template = el.textContent
             }
 
-            context = {}
+            const context = {}
             context[vText] = dataToBind;
 
             // if (right !== null) {
@@ -408,17 +427,39 @@ function parseClassBinding(str, context) {
     const isNegated = !!match[2];
     const variableName = match[3];
 
-    const value = context[variableName];
+    // todo: verificat daca e reactiv
+    const value = context[variableName].value ?? context[variableName];
     obj[className] = isNegated ? !value : !!value;
   }
 
   return obj;
 }
 
-function computed(getter) {
+export function computed(getter) {
     return {
         get value() {
             return getter()
         }
     }
+}
+
+export function defineEmits(eventNames = [], currentComponentName = null) {
+  return function emit(eventName, payload) {
+    if (!eventNames.includes(eventName)) {
+      console.warn(`Event "${eventName}" is not defined in emits.`);
+      return;
+    }
+    const currentComponent = rootComponents[currentComponentName] ?? false;
+
+    
+    // Dispatch a CustomEvent on the root element or component root
+    if (currentComponent) {
+      const event = new CustomEvent(eventName, {
+        detail: payload,
+        bubbles: true,
+        composed: true,
+      });
+      currentComponent.dispatchEvent(event);
+    }
+  };
 }

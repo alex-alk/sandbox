@@ -1,6 +1,6 @@
 import { reactive, init, computed, defineEmits } from '../main.js'
 
-export default function ReviewForm() {
+export function ReviewForm() {
   const html= `
     <form class="review-form" v-on:submit="onSubmit">
     <h3>Leave a review</h3>
