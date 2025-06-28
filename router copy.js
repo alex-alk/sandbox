@@ -55,80 +55,36 @@ export function RouterViewComponent(routes) {
 }
 
 export function resolveMatched(routes, urlPath) {
-  const segments = urlPath
-    .replace(/^\/|\/$/g, '')  // trim leading/trailing slash
-    .split('/')
-    .filter(Boolean);         // remove empty segments
-
+  const segments = urlPath.replace(/^\/|\/$/g, '').split('/').filter(Boolean);
   const matched = [];
 
-  // Find root route: path === '/'
-  const rootRoute = routes.find(r => r.path === '/');
-  if (!rootRoute) return matched;  // no root route, return empty
+  let currentRoutes = routes;
 
-  matched.push(rootRoute);
-
-  let currentRoutes = rootRoute.children || [];
-
-  // If no segments (e.g. urlPath === '/'), try to find default child ('')
+  // If segments is empty (e.g. urlPath = '/'), manually push matching child routes with path '/'
   if (segments.length === 0) {
-    const defaultChild = currentRoutes.find(r => r.path === '');
-    if (defaultChild) matched.push(defaultChild);
+    // Find root route
+    const rootRoute = currentRoutes.find(r => r.path === '/');
+    if (rootRoute) {
+      matched.push(rootRoute);
+      // Check children for path '/'
+      const childRoute = (rootRoute.children || []).find(r => r.path === '/');
+      if (childRoute) {
+        matched.push(childRoute);
+      }
+    }
     return matched;
   }
 
-  // For each segment, try to find matching child route
-  for (const segment of segments) {
+  // For non-root paths, existing logic:
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
     const record = currentRoutes.find(r => r.path === segment);
-    if (!record) break;  // stop if no match
-
+    if (!record) break;
     matched.push(record);
     currentRoutes = record.children || [];
   }
 
   return matched;
-}
-
-
-export function resolveMatched__(routes, urlPath) {
-    console.log(urlPath)
-    const segments = urlPath.replace(/^\/|\/$/g, '').split('/').filter(Boolean);
-    console.log(segments)
-    const matched = [];
-
-    let currentRoutes = routes;
-
-    // If segments is empty (e.g. urlPath = '/'), manually push matching child routes with path '/'
-    if (segments.length === 0) {
-        
-        const rootRoute = currentRoutes.find(r => r.path === '/');
-
-        if (rootRoute) {
-            matched.push(rootRoute);
-            // Check children for path '' (empty string)
-            const childRoute = (rootRoute.children || []).find(r => r.path === '');
-            if (childRoute) {
-            matched.push(childRoute);
-            }
-        }
-
-        return matched;
-    }
-
-
-    // For non-root paths, existing logic:
-    for (let i = 0; i < segments.length; i++) {
-        const segment = segments[i];
-
-        const record = currentRoutes.find(r => r.path === segment);
-
-        if (!record) break;
-        matched.push(record);
-
-        currentRoutes = record.children || [];
-    }
-
-    return matched;
 }
 
 

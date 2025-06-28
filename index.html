@@ -15,6 +15,9 @@
     import './main.js';
     import './router-view.js';
     import { routes } from './routes.js'
+    import { resolveMatched } from './router.js'
+
+    //console.log('Test resolveMatched("/"):', resolveMatched(routes, '/').map(r => r.path));
 
     const viewEl = document.querySelector('router-view');
     viewEl.routes = routes;
