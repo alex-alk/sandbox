@@ -395,15 +395,12 @@ function hydrate(rootComponent, el, data) {
                         });
                     }
 
-                    console.log('adding el')
                     el.insertAdjacentElement('beforeBegin', clone)
 
                     bindings[rootComponent] ??= {};
                     bindings[rootComponent][right] ??= {};
                     bindings[rootComponent][right]['v-for'] ??= {};
                     bindings[rootComponent][right]['v-for'][item.id ?? itemKey] = clone;
-
-                    console.log('adding binding: ', bindings[rootComponent][right]['v-for'])
                 }
             }
         })

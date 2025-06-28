@@ -33,26 +33,11 @@ const updateCart = (id) => {
 
 
 
-
-
 const app = document.getElementById('app');
-
-// app.addEventListener('add-to-cart', e => {
-//   console.log('Caught at app root:', e.detail);
-// });
-
-
 
 
 app.innerHTML = content.trim()
 init(app, { cart, premium, productDisplay, updateCart }, 'index')
-
-// const testEvent = new CustomEvent('add-to-cart', {
-//   detail: 123,
-//   bubbles: true,
-//   composed: true
-// });
-// productDisplay.dispatchEvent(testEvent);
 
 </script>
 </body>
