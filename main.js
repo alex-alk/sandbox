@@ -1,7 +1,7 @@
 let activeEffect = null
 const targetMap = new WeakMap();
 
-function effect(fn) {
+export function effect(fn) {
     activeEffect = fn
     if (activeEffect) {
         activeEffect()
@@ -425,7 +425,6 @@ function hydrate(rootComponent, el, data) {
     const vText = el.getAttribute('v-text');
     if (vText) {
         effect(() => {
-            
             const dataToBind = data[vText].value
             
             if (!el.dataset.template) {

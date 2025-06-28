@@ -1,44 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Index</title>
-  <link href="assets/main.css" rel="stylesheet">
-  <script src="main.js" defer type="module"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>My App</title>
+  <link href="assets/main.css" rel="stylesheet" />
 </head>
 <body>
   <div id="app">
+    <router-view></router-view>
   </div>
 
-<script type="module">
-import { ProductDisplay } from './components/ProductDisplay.js'
-import { ref, init } from './main.js'
+  <script type="module">
+    import './main.js';
+    import './router-view.js';
+    import { routes } from './routes.js'
 
-const content = `
-<div class="nav-bar"></div>
-<div class="cart" v-text="cart">Cart({{ cart.length }})</div>
-<template v-component="productDisplay" @add-to-cart="updateCart"></template>
-`
+    const viewEl = document.querySelector('router-view');
+    viewEl.routes = routes;
 
-const cart = ref([])
-const premium = ref(true)
-
-const productDisplay =  ProductDisplay(premium)
-
-const updateCart = (id) => {
-  console.log('Update Cart')
-  cart.value.push(id)
-}
-
-
-
-const app = document.getElementById('app');
-
-
-app.innerHTML = content.trim()
-init(app, { cart, premium, productDisplay, updateCart }, 'index')
-
-</script>
+  </script>
 </body>
 </html>
