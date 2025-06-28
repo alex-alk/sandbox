@@ -1,6 +1,6 @@
 import { init,ref, reactive } from "../main.js";
 
-export default function ReviewList(reviews) {
+export function ReviewList(reviews) {
 
 const templ = `
   <div class="review-container">

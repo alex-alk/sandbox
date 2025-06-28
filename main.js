@@ -127,7 +127,7 @@ export function init(rootComponent, data, cname) {
 
     const directives = [
         'v-for', 'v-text', 'v-bind:src', 'v-if', 'v-on:click', ':class', 'v-bind:class', ':disabled',
-        ':style', 'v-component'
+        ':style', 'v-component', 'v-on:submit', 'v-model'
     ]
 
     // build a comma separated selector
@@ -145,6 +145,70 @@ export function init(rootComponent, data, cname) {
 
 function hydrate(rootComponent, el, data) {
     // get directives
+    const vModel = el.getAttribute('v-model')
+    if (vModel) {
+        const modelAttr = vModel;
+        const [modelPathRaw, ...modRaw] = modelAttr.split('.');
+        const modifiers = modRaw || [];
+        const pathParts = modelAttr.split('.');
+        const modelName = pathParts[0];
+
+
+        const getModelValue = () => getPropByPath(data, modelAttr);
+        const setModelValue = (val) => {
+            const path = pathParts.slice(1);
+            let obj = data[modelName];
+            if ('value' in obj) obj = obj.value; // unwrap ref
+            let target = obj;
+
+            for (let i = 0; i < path.length - 1; i++) {
+                if (!target[path[i]]) return;
+                target = target[path[i]];
+            }
+
+            const lastKey = path[path.length - 1];
+
+            if (path.length === 0) {
+                if ('value' in data[modelName]) {
+                    data[modelName].value = val;
+                } else {
+                    data[modelName] = val;
+                }
+            } else {
+                target[lastKey] = val;
+            }
+        };
+
+        const currentValue = getModelValue();
+
+        if (el.tagName === 'SELECT') {
+            el.value = currentValue;
+            el.addEventListener('change', (e) => {
+                let newVal = e.target.value;
+                if (modifiers.includes('number')) newVal = Number(newVal);
+                setModelValue(newVal);
+            });
+        } else if (el.type === 'checkbox') {
+            el.checked = currentValue;
+            el.addEventListener('change', (e) => {
+                setModelValue(e.target.checked);
+            });
+        } else {
+            el.value = currentValue;
+            el.addEventListener('input', (e) => {
+                let newVal = e.target.value;
+                if (modifiers.includes('number')) newVal = Number(newVal);
+                if (modifiers.includes('trim')) newVal = newVal.trim();
+                setModelValue(newVal);
+            });
+        }
+    }
+
+
+    const vSubmit = el.getAttribute('v-on:submit')
+    if (vSubmit) {
+        el.addEventListener('submit', data[vSubmit])
+    }
 
     const vComponent = el.getAttribute('v-component');
     if (vComponent) {
@@ -158,8 +222,9 @@ function hydrate(rootComponent, el, data) {
                 const eventName = attr.name.slice(1); // e.g. 'add-to-cart'
                 const handlerName = attr.value;       // e.g. 'updateCart'
                 const handlerFn = data[handlerName];
+
                 if (typeof handlerFn === 'function') {
-                    component.addEventListener(eventName, handlerFn);
+                    component.addEventListener(eventName,  e => handlerFn(e.detail));
                 }
             }
         });
@@ -228,6 +293,7 @@ function hydrate(rootComponent, el, data) {
 
         effect(() => {
             const dataToBind = data[right].value
+            //console.log(dataToBind)
 
             let dataToBindIndexed = []
             for (const dataItem of dataToBind) {
@@ -451,7 +517,8 @@ export function defineEmits(eventNames = [], currentComponentName = null) {
     }
     const currentComponent = rootComponents[currentComponentName] ?? false;
 
-    
+    console.log('payload')
+    console.log(payload)
     // Dispatch a CustomEvent on the root element or component root
     if (currentComponent) {
       const event = new CustomEvent(eventName, {

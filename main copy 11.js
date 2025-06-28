@@ -425,62 +425,62 @@ function updateElement(el, directive, value, data) {
 
 
     if (directive === 'v-model') {
-    const modelAttr = el.getAttribute(directive);
-    const [modelPathRaw, ...modRaw] = modelAttr.split('.');
-    const modifiers = modRaw || [];
-    const pathParts = modelAttr.split('.');
-    const modelName = pathParts[0];
+        const modelAttr = el.getAttribute(directive);
+        const [modelPathRaw, ...modRaw] = modelAttr.split('.');
+        const modifiers = modRaw || [];
+        const pathParts = modelAttr.split('.');
+        const modelName = pathParts[0];
 
 
-    const getModelValue = () => getPropByPath(data, modelAttr);
-    const setModelValue = (val) => {
-        const path = pathParts.slice(1);
-        let obj = data[modelName];
-        if ('value' in obj) obj = obj.value; // unwrap ref
-        let target = obj;
+        const getModelValue = () => getPropByPath(data, modelAttr);
+        const setModelValue = (val) => {
+            const path = pathParts.slice(1);
+            let obj = data[modelName];
+            if ('value' in obj) obj = obj.value; // unwrap ref
+            let target = obj;
 
-        for (let i = 0; i < path.length - 1; i++) {
-            if (!target[path[i]]) return;
-            target = target[path[i]];
-        }
-
-        const lastKey = path[path.length - 1];
-
-        if (path.length === 0) {
-            if ('value' in data[modelName]) {
-                data[modelName].value = val;
-            } else {
-                data[modelName] = val;
+            for (let i = 0; i < path.length - 1; i++) {
+                if (!target[path[i]]) return;
+                target = target[path[i]];
             }
+
+            const lastKey = path[path.length - 1];
+
+            if (path.length === 0) {
+                if ('value' in data[modelName]) {
+                    data[modelName].value = val;
+                } else {
+                    data[modelName] = val;
+                }
+            } else {
+                target[lastKey] = val;
+            }
+        };
+
+        const currentValue = getModelValue();
+
+        if (el.tagName === 'SELECT') {
+            el.value = currentValue;
+            el.addEventListener('change', (e) => {
+                let newVal = e.target.value;
+                if (modifiers.includes('number')) newVal = Number(newVal);
+                setModelValue(newVal);
+            });
+        } else if (el.type === 'checkbox') {
+            el.checked = currentValue;
+            el.addEventListener('change', (e) => {
+                setModelValue(e.target.checked);
+            });
         } else {
-            target[lastKey] = val;
+            el.value = currentValue;
+            el.addEventListener('input', (e) => {
+                let newVal = e.target.value;
+                if (modifiers.includes('number')) newVal = Number(newVal);
+                if (modifiers.includes('trim')) newVal = newVal.trim();
+                setModelValue(newVal);
+            });
         }
-    };
-
-    const currentValue = getModelValue();
-
-    if (el.tagName === 'SELECT') {
-        el.value = currentValue;
-        el.addEventListener('change', (e) => {
-            let newVal = e.target.value;
-            if (modifiers.includes('number')) newVal = Number(newVal);
-            setModelValue(newVal);
-        });
-    } else if (el.type === 'checkbox') {
-        el.checked = currentValue;
-        el.addEventListener('change', (e) => {
-            setModelValue(e.target.checked);
-        });
-    } else {
-        el.value = currentValue;
-        el.addEventListener('input', (e) => {
-            let newVal = e.target.value;
-            if (modifiers.includes('number')) newVal = Number(newVal);
-            if (modifiers.includes('trim')) newVal = newVal.trim();
-            setModelValue(newVal);
-        });
     }
-}
 
 
     if (directive === 'v-text') {

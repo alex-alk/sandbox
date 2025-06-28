@@ -1,5 +1,6 @@
 import { ref, init, computed, defineEmits } from '../main.js'
 import { ReviewForm } from './ReviewForm.js'
+import { ReviewList } from './ReviewList.js'
 
 export function ProductDisplay(premium = {}) {
 
@@ -35,7 +36,8 @@ const html = `
         </button>
       </div>
     </div>
-    <template v-component="reviewForm"></template>
+    <template v-component="reviewList"></template>
+    <template v-component="reviewForm" @review-submitted="addReview"></template>
   </div>
 `
 
@@ -86,6 +88,16 @@ const shipping = computed(() => {
 
 const reviewForm =  ReviewForm()
 
+const reviews = ref([])
+
+const addReview = (review) => {
+    console.log('addReview')
+    console.log(review)
+    reviews.value.push(review)
+}
+
+const reviewList = ReviewList(reviews)
+
 
 const template = document.createElement('template')
 template.innerHTML = html
@@ -93,7 +105,7 @@ const component = template.content
 
 init(component, {
     product, image, inStock, details, variants, 
-    addToCart, brand, title, updateVariant, shipping, reviewForm
+    addToCart, brand, title, updateVariant, shipping, reviewForm, addReview, reviewList
 }, 'ProductDisplay')
 
 return component;
