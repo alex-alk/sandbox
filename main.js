@@ -293,7 +293,6 @@ function hydrate(rootComponent, el, data) {
 
         effect(() => {
             const dataToBind = data[right].value
-            //console.log(dataToBind)
 
             let dataToBindIndexed = []
             for (const dataItem of dataToBind) {
@@ -396,13 +395,15 @@ function hydrate(rootComponent, el, data) {
                         });
                     }
 
-
+                    console.log('adding el')
                     el.insertAdjacentElement('beforeBegin', clone)
 
                     bindings[rootComponent] ??= {};
                     bindings[rootComponent][right] ??= {};
                     bindings[rootComponent][right]['v-for'] ??= {};
-                    bindings[rootComponent][right]['v-for'][item.id] = el;
+                    bindings[rootComponent][right]['v-for'][item.id ?? itemKey] = clone;
+
+                    console.log('adding binding: ', bindings[rootComponent][right]['v-for'])
                 }
             }
         })
@@ -517,8 +518,6 @@ export function defineEmits(eventNames = [], currentComponentName = null) {
     }
     const currentComponent = rootComponents[currentComponentName] ?? false;
 
-    console.log('payload')
-    console.log(payload)
     // Dispatch a CustomEvent on the root element or component root
     if (currentComponent) {
       const event = new CustomEvent(eventName, {

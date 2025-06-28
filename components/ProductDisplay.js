@@ -91,8 +91,6 @@ const reviewForm =  ReviewForm()
 const reviews = ref([])
 
 const addReview = (review) => {
-    console.log('addReview')
-    console.log(review)
     reviews.value.push(review)
 }
 
