@@ -1,12 +1,11 @@
 import BaseComponent from './BaseComponent.js'
-import ProductDisplay from './components/ProductDisplay.js';
+import './components/ProductDisplay.js';
 
 export default class HomePage extends BaseComponent {
     render() {
         this.innerHTML = `
 <div class="nav-bar"></div>
 <div class="cart" id="v-cart"></div>
-<ProductDisplay :premium="premiumm" @add-to-cart="updateCart"></ProductDisplay>
 <product-display add="addToCart" premium="premiumm"></product-display>`
 
         const $cart = this.querySelector('#v-cart')
