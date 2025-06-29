@@ -1,163 +1,75 @@
-// router.js
-import { ref, effect } from './main.js';
-
-export const base = "/js/sandbox";
-
-// 1️⃣ Reactive current route
-export const currentRoute = ref(window.location.pathname.replace(base, "") || "/");
-
-// Listen to browser navigation
-window.addEventListener('popstate', () => {
-  currentRoute.value = window.location.pathname.replace(base, "") || "/";
-});
-
-export function push(path) {
-  const full = base + path;
-  history.pushState({}, "", full);
-  currentRoute.value = window.location.pathname.replace(base, "") || "/";
-}
-
-// 3️⃣ <router-link> component
-export function RouterLinkComponent() {
-  const html = `
-    <a href="#" to="" class="router-link">@slot</a>
-  `;
-  const template = document.createElement('template');
-  template.innerHTML = html;
-  const el = template.content.firstElementChild;
-
-  function onClick(e) {
-    e.preventDefault();
-    const to = el.getAttribute('to');
-    push(to);
+export default class Router {
+  /**
+   * @param {Object} routes - Map of route paths to component classes
+   * @param {string} basePath - Base URL path, e.g. "/app"
+   */
+  constructor(routes, basePath = '/') {
+    this.routes = routes;
+    // Normalize basePath: remove trailing slash except for "/"
+    this.basePath = basePath === '/' ? '' : basePath.replace(/\/$/, '');
+    this.rootElem = document.querySelector('app-root');
+    window.addEventListener('popstate', () => this.route());
   }
 
-  // Bind click
-  init(el, { onClick }, 'RouterLink');
-  return el;
-}
-
-// 4️⃣ <router-view> component
-export function RouterViewComponent(routes) {
-  const html = `<div class="router-view"></div>`;
-  const template = document.createElement('template');
-  template.innerHTML = html;
-  const el = template.content.firstElementChild;
-
-  effect(() => {
-    const route = window.location.pathname.replace(base, "") || "/";
-    const View = routes[route] || routes["*"];
-    el.innerHTML = '';
-    if (View) el.appendChild(View());
-  });
-
-  return el;
-}
-
-export function resolveMatched(routes, urlPath) {
-  const segments = urlPath
-    .replace(/^\/|\/$/g, '')  // trim leading/trailing slash
-    .split('/')
-    .filter(Boolean);         // remove empty segments
-
-  const matched = [];
-
-  // Find root route: path === '/'
-  const rootRoute = routes.find(r => r.path === '/');
-  if (!rootRoute) return matched;  // no root route, return empty
-
-  matched.push(rootRoute);
-
-  let currentRoutes = rootRoute.children || [];
-
-  // If no segments (e.g. urlPath === '/'), try to find default child ('')
-  if (segments.length === 0) {
-    const defaultChild = currentRoutes.find(r => r.path === '');
-    if (defaultChild) matched.push(defaultChild);
-    return matched;
+  // Remove base path prefix from full path to get route key
+  _stripBase(path) {
+    if (this.basePath && path.startsWith(this.basePath)) {
+      const stripped = path.slice(this.basePath.length) || '/';
+      return stripped.startsWith('/') ? stripped : '/' + stripped;
+    }
+    return path;
   }
 
-  // For each segment, try to find matching child route
-  for (const segment of segments) {
-    const record = currentRoutes.find(r => r.path === segment);
-    if (!record) break;  // stop if no match
-
-    matched.push(record);
-    currentRoutes = record.children || [];
+  // Add base path prefix to a route path
+  _addBase(path) {
+    if (path === '/') return this.basePath || '/';
+    return this.basePath + path;
   }
 
-  return matched;
-}
+  // Navigate to a route programmatically
+  navigate(path) {
+    const fullPath = this._addBase(path);
+    if (fullPath !== location.pathname) {
+      history.pushState({}, '', fullPath);
+      this.route();
+    }
+  }
 
+  // Match current URL to route and render component
+  route() {
+    const fullPath = location.pathname;
+    const routePath = this._stripBase(fullPath);
 
-export function resolveMatched__(routes, urlPath) {
-    console.log(urlPath)
-    const segments = urlPath.replace(/^\/|\/$/g, '').split('/').filter(Boolean);
-    console.log(segments)
-    const matched = [];
+    const RouteComponent = this.routes[routePath] || this.routes['/404'];
 
-    let currentRoutes = routes;
-
-    // If segments is empty (e.g. urlPath = '/'), manually push matching child routes with path '/'
-    if (segments.length === 0) {
-        
-        const rootRoute = currentRoutes.find(r => r.path === '/');
-
-        if (rootRoute) {
-            matched.push(rootRoute);
-            // Check children for path '' (empty string)
-            const childRoute = (rootRoute.children || []).find(r => r.path === '');
-            if (childRoute) {
-            matched.push(childRoute);
-            }
-        }
-
-        return matched;
+    if (!RouteComponent) {
+      console.error(`No route matched for path: ${routePath}`);
+      return;
     }
 
-
-    // For non-root paths, existing logic:
-    for (let i = 0; i < segments.length; i++) {
-        const segment = segments[i];
-
-        const record = currentRoutes.find(r => r.path === segment);
-
-        if (!record) break;
-        matched.push(record);
-
-        currentRoutes = record.children || [];
-    }
-
-    return matched;
-}
-
-
-
-
-export function resolveMatched_(routes, urlPath) {
-  const segments = urlPath
-    .replace(/^\/|\/$/g, '')   // trim leading/trailing slash
-    .split('/')
-    .filter(Boolean);
-
-  const matched = [];
-  let currentRoutes = routes;
-  let prefix = '';
-
-  for (let i = 0; i <= segments.length; i++) {
-    const segment = segments[i] || '';
-    // Try to find a matching route
-    const record =
-      currentRoutes.find(r => (r.path === segment) || (i === 0 && r.path === '/')) ||
-      currentRoutes.find(r => r.path === '*');
-
-    if (!record) break;
-    matched.push(record);
-
-    // Prepare for next level
-    prefix += '/' + segment;
-    currentRoutes = record.children || [];
+    this.rootElem.innerHTML = '';
+    const el = new RouteComponent();
+    this.rootElem.appendChild(el);
   }
 
-  return matched;
+  // Start the router: listen to clicks, initial route render
+  start() {
+    document.body.addEventListener('click', (e) => {
+      const link = e.target.closest('a');
+      if (!link) return;
+
+      const href = link.getAttribute('href');
+      if (!href) return;
+      if (!href.startsWith('/')) return; // only handle absolute paths
+
+      // Only handle links inside the base path
+      if (this.basePath === '' || href.startsWith(this.basePath + '/') || href === this.basePath) {
+        e.preventDefault();
+        const routePath = this._stripBase(href);
+        this.navigate(routePath);
+      }
+    });
+
+    this.route();
+  }
 }
