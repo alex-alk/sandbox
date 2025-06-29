@@ -1,11 +1,12 @@
-import HomePage from './HomePage.js'
 import AboutPage from './AboutPage.js'
 import NotFoundPage from './NotFoundPage.js'
 import Router from './Router.js'
+import { Dashboard } from './Dashboard.js'
+import { TopbarComp } from './TopbarComp.js'
 
 // Define routes map
 const routes = {
-  '/': HomePage,
+  '/': Dashboard,
   '/about': AboutPage,
   '/404': NotFoundPage,
 };

@@ -3,7 +3,7 @@ export default class Router {
     constructor(routes, basePath = '') {
         this.routes = routes;
         this.basePath = basePath
-        this.rootElem = document.querySelector('app-root');
+        this.rootElem = document.querySelector('#app');
         // listen to history changes
         window.addEventListener('popstate', () => this.route());
     }
@@ -38,7 +38,7 @@ export default class Router {
         }
 
         this.rootElem.innerHTML = '';
-        const el = new RouteComponent();
+        const el = (new RouteComponent).getElement();
         this.rootElem.appendChild(el);
     }
 
