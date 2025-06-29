@@ -1,6 +1,7 @@
 import BaseComponent from '../BaseComponent.js'
-import './ReviewForm.js';
+import './ReviewForm.js'
 import './ReviewList.js'
+import { path } from '../routes.js'
 
 export default class ProductDisplay extends BaseComponent {
     static get observedAttributes() {
@@ -57,8 +58,8 @@ export default class ProductDisplay extends BaseComponent {
         const brand = 'Vue Mastery'
         $product.textContent = product + ' ' + brand
 
-        const socksGreenImage = 'assets/images/socks_green.jpeg'
-        const socksBlueImage = 'assets/images/socks_blue.jpeg'
+        const socksGreenImage = path('/assets/images/socks_green.jpeg')
+        const socksBlueImage = path('/assets/images/socks_blue.jpeg')
 
         if (this.getAttribute('premium')) {
             $shipping.textContent = 'Shipping: Free'

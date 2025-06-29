@@ -5,6 +5,7 @@ export default class HomePage extends BaseComponent {
     render() {
         this.innerHTML = `
 <div class="nav-bar"></div>
+<a href="/js/sandbox/about">About</a>
 <div class="cart" id="v-cart"></div>
 <product-display add="addToCart" premium="premiumm"></product-display>`
 

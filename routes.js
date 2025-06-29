@@ -13,9 +13,12 @@ const routes = {
 // Change this to your app's base path, e.g. '/app' or '/' if root
 const BASE_PATH = '/js/sandbox';
 
+export function path(projectPath) {
+    return BASE_PATH + projectPath
+}
+
 // Instantiate and start router
 const router = new Router(routes, BASE_PATH);
-
 window.addEventListener('DOMContentLoaded', () => {
-  router.start();
+    router.start();
 });

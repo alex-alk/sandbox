@@ -1,75 +1,65 @@
 export default class Router {
-  /**
-   * @param {Object} routes - Map of route paths to component classes
-   * @param {string} basePath - Base URL path, e.g. "/app"
-   */
-  constructor(routes, basePath = '/') {
-    this.routes = routes;
-    // Normalize basePath: remove trailing slash except for "/"
-    this.basePath = basePath === '/' ? '' : basePath.replace(/\/$/, '');
-    this.rootElem = document.querySelector('app-root');
-    window.addEventListener('popstate', () => this.route());
-  }
 
-  // Remove base path prefix from full path to get route key
-  _stripBase(path) {
-    if (this.basePath && path.startsWith(this.basePath)) {
-      const stripped = path.slice(this.basePath.length) || '/';
-      return stripped.startsWith('/') ? stripped : '/' + stripped;
-    }
-    return path;
-  }
-
-  // Add base path prefix to a route path
-  _addBase(path) {
-    if (path === '/') return this.basePath || '/';
-    return this.basePath + path;
-  }
-
-  // Navigate to a route programmatically
-  navigate(path) {
-    const fullPath = this._addBase(path);
-    if (fullPath !== location.pathname) {
-      history.pushState({}, '', fullPath);
-      this.route();
-    }
-  }
-
-  // Match current URL to route and render component
-  route() {
-    const fullPath = location.pathname;
-    const routePath = this._stripBase(fullPath);
-
-    const RouteComponent = this.routes[routePath] || this.routes['/404'];
-
-    if (!RouteComponent) {
-      console.error(`No route matched for path: ${routePath}`);
-      return;
+    constructor(routes, basePath = '') {
+        this.routes = routes;
+        this.basePath = basePath
+        this.rootElem = document.querySelector('app-root');
+        // listen to history changes
+        window.addEventListener('popstate', () => this.route());
     }
 
-    this.rootElem.innerHTML = '';
-    const el = new RouteComponent();
-    this.rootElem.appendChild(el);
-  }
+    // Remove base path prefix from full path to get route key
+    stripBase(path) { // path = basepath + real path
+        
+        if (this.basePath && path.startsWith(this.basePath)) {
+            const stripped = path.slice(this.basePath.length);
+            return stripped;
+        }
+        return path;
+    }
 
-  // Start the router: listen to clicks, initial route render
-  start() {
-    document.body.addEventListener('click', (e) => {
-      const link = e.target.closest('a');
-      if (!link) return;
+    // Navigate to a route programmatically
+    navigate(fullPath) {
+        if (fullPath !== location.pathname) {
+            history.pushState({}, '', fullPath);
+            this.route();
+        }
+    }
 
-      const href = link.getAttribute('href');
-      if (!href) return;
-      if (!href.startsWith('/')) return; // only handle absolute paths
+    // Match current URL to route and render component
+    route() {
+        const routePath = this.stripBase(location.pathname);
 
-      // Only handle links inside the base path
-      if (this.basePath === '' || href.startsWith(this.basePath + '/') || href === this.basePath) {
-        e.preventDefault();
-        const routePath = this._stripBase(href);
-        this.navigate(routePath);
-      }
-    });
+        const RouteComponent = this.routes[routePath] || this.routes['/404'];
 
-    this.route();
-  }
+        if (!RouteComponent) {
+            console.error(`No route matched for path: ${routePath}`);
+            return;
+        }
+
+        this.rootElem.innerHTML = '';
+        const el = new RouteComponent();
+        this.rootElem.appendChild(el);
+    }
+
+    // Start the router: initial route render, listen to clicks
+    start() {
+        this.route();
+
+        document.body.addEventListener('click', (e) => {
+            const link = e.target.closest('a');
+            if (!link) return;
+
+            const to = link.getAttribute('href');
+            if (!to) return;
+            if (!to.startsWith('/')) return; // only handle absolute paths
+
+            // Only handle links inside the base path
+            if (this.basePath === '' || to.startsWith(this.basePath + '/') || to === this.basePath) {
+                e.preventDefault();
+                //const realPath = this.stripBase(to);
+                this.navigate(to);
+            }
+        });
+    }
 }
