@@ -1,15 +1,40 @@
-import AboutPage from './AboutPage.js'
+import { AboutPage } from './AboutPage.js'
 import NotFoundPage from './NotFoundPage.js'
 import Router from './Router.js'
 import { Dashboard } from './Dashboard.js'
-import { TopbarComp } from './TopbarComp.js'
+import { AboutPagee } from './AboutPagee.js'
+import { AppLayout } from './AppLayout.js'
+import { Users } from './Users.js'
 
 // Define routes map
-const routes = {
-  '/': Dashboard,
-  '/about': AboutPage,
-  '/404': NotFoundPage,
-};
+const routes = [
+    {
+        path: '/',
+        component:  AppLayout,
+        children: [
+            {
+                path : '/',
+                component: Dashboard
+            },
+            {
+                path : '/about',
+                component: AboutPage
+            },
+            {
+                path: '/users',
+                component : Users
+            },
+            {
+                path: '/userss',
+                component : AboutPagee
+            }
+        ]
+    },
+    {
+        path: '/404',
+        component: NotFoundPage,
+    }
+];
 
 // Change this to your app's base path, e.g. '/app' or '/' if root
 const BASE_PATH = '/js/sandbox';

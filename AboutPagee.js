@@ -1,11 +1,11 @@
 import { createComponent } from "./main.js"
 
-export class AboutPage {
+export class AboutPagee {
 
     getElement() {
         const html = /* html */`
 <div>
-    About page
+    About pageeeeeee
 </div>
 `
         return createComponent(html)

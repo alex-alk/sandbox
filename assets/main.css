@@ -50,6 +50,11 @@ html {
     --primary-color: #10b981;
     --surface-hover: #f1f5f9;
     --text-color: #334155;
+    --surface-card: white;
+}
+
+*, ::before, ::after {
+    box-sizing: border-box;
 }
 
 .layout-sidebar {
@@ -133,4 +138,38 @@ a {
  {
     width: 1.28571429em;
     text-align: center;
+}
+
+@media (min-width: 992px) {
+    .layout-wrapper.layout-static .layout-main-container {
+        margin-left: 22rem;
+    }
+}
+
+.layout-main-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    justify-content: space-between;
+    padding: 6rem 2rem 0 2rem;
+    transition: margin-left var(--layout-section-transition-duration);
+}
+.card {
+    background: var(--surface-card);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    border-radius: var(--content-border-radius);
+}
+
+.font-semibold {
+    font-weight: 600;
+}
+
+.text-xl {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+}
+
+.mb-4 {
+    margin-bottom: 1rem;
 }

@@ -10,7 +10,7 @@ export class Sidebar {
             <div class="layout-menuitem-root-text">HOME</div>
             <ul class="layout-submenu">
                 <li>
-                    <a href="" class="router-link-active router-link-exact-active active-route">
+                    <a href="/" class="router-link-active router-link-exact-active active-route">
                         <i class="pi pi-fw pi-home layout-menuitem-icon"></i>
                         <span class="layout-menuitem-text">Dashboard</span>
                     </a>
@@ -22,9 +22,15 @@ export class Sidebar {
             <div class="layout-menuitem-root-text">Actiuni</div>
             <ul class="layout-submenu">
                 <li>
-                    <a href="" class="router-link-active router-link-exact-active active-route">
+                    <a href="/users" class="router-link-active router-link-exact-active active-route">
                         <i class="pi pi-fw pi-id-card layout-menuitem-icon"></i>
                         <span class="layout-menuitem-text">Utilizatori</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/userss" class="router-link-active router-link-exact-active active-route">
+                        <i class="pi pi-fw pi-id-card layout-menuitem-icon"></i>
+                        <span class="layout-menuitem-text">Utilizatoriiii</span>
                     </a>
                 </li>
             </ul>
