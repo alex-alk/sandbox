@@ -97,7 +97,7 @@ export default class Router {
         const layoutPath = match.matchedRoute.path;
 
         if (this.currentLayoutPath !== layoutPath) {
-            // 👇 re-render whole layout if layout has changed
+            // re-render whole layout if main path has changed
             this.rootElem.innerHTML = '';
             const layoutEl = new RouteComponent().getElement();
 
@@ -114,7 +114,7 @@ export default class Router {
             this.rootElem.appendChild(layoutEl);
             this.currentLayoutPath = layoutPath; // ✅ update current layout
         } else {
-            // ✅ re-use layout, just swap child content
+            // re-use layout, just swap child content
             //const parentRouterView = this.rootElem.querySelector('router-view');
             if (!this.routerViewParent) {
                 console.warn('<router-view> not found in existing layout');
