@@ -1,11 +1,12 @@
 export default class Router {
 
     constructor(routes, basePath = '') {
-        this.routes = routes;
+        this.routes = routes
         this.basePath = basePath
-        this.rootElem = document.querySelector('#app');
-        this.currentLayoutPath = null;
-        this.routerViewParent = null;
+        this.rootElem = document.querySelector('#app')
+        this.currentMainLayoutPath = null
+        this.currentChildLayoutPath = null
+        this.layoutContainer = null
         // listen to history changes
         window.addEventListener('popstate', () => this.route());
     }
@@ -36,9 +37,11 @@ export default class Router {
     }
 
     findRoute(path, routes) {
+        // looping main routes
         for (const matchedRoute of routes) {
             const regex = this.pathToRegex(matchedRoute.path);
             if (regex.test(path)) {
+                // ex: this will match / with / as child route and other main routes
                 if (matchedRoute.children) {
                     for (const matchedChildRoute of matchedRoute.children) {
                         const childRegex = this.pathToRegex(matchedChildRoute.path);
@@ -50,6 +53,23 @@ export default class Router {
                     return { matchedRoute, matchedChildRoute: null };
                 }
             }
+        }
+
+        // matching everyting else
+        for (const matchedRoute of routes) {
+            //const regex = this.pathToRegex(matchedRoute.path);
+            // if (regex.test(path)) {
+            //     if (matchedRoute.children) {
+            //         for (const matchedChildRoute of matchedRoute.children) {
+            //             const childRegex = this.pathToRegex(matchedChildRoute.path);
+            //             if (childRegex.test(path)) {
+            //                 return { matchedRoute, matchedChildRoute };
+            //             }
+            //         }
+            //     } else {
+            //         return { matchedRoute, matchedChildRoute: null };
+            //     }
+            // }
 
             if (matchedRoute.children) {
                 for (const matchedChildRoute of matchedRoute.children) {
@@ -94,29 +114,54 @@ export default class Router {
             return;
         }
 
-        const layoutPath = match.matchedRoute.path;
+        const mainLayoutPath = match.matchedRoute.path;
 
-        if (this.currentLayoutPath !== layoutPath) {
+        if (this.currentMainLayoutPath !== mainLayoutPath) {
             // re-render whole layout if main path has changed
-            this.rootElem.innerHTML = '';
             const layoutEl = new RouteComponent().getElement();
-
             if (match.matchedChildRoute) {
+                
                 const Child = match.matchedChildRoute.component;
                 const childEl = new Child().getElement();
+                // ex: in AppLayout
                 const parentRouterView = layoutEl.querySelector('router-view');
-                this.routerViewParent = parentRouterView.parentElement
+                // ex: layout-main div
+                this.layoutContainer = parentRouterView.parentElement
+                
                 if (parentRouterView) {
-                    parentRouterView.replaceWith(childEl);
+                    // replace router-view with child match component
+                    this.layoutContainer.replaceChildren(childEl);
                 }
             }
 
-            this.rootElem.appendChild(layoutEl);
-            this.currentLayoutPath = layoutPath; // ✅ update current layout
+            this.rootElem.replaceChildren(layoutEl);
+            this.currentMainLayoutPath = mainLayoutPath
         } else {
+            // main route did not change, so a child must be changed
+
+            const childLayoutPath = match.matchedChildRoute.path;
+
+            if (childLayoutPath) {
+                if (this.currentChildLayoutPath !== childLayoutPath) {
+                    const Child = match.matchedChildRoute.component;
+                    const childEl = new Child().getElement();
+
+                    //if (this.routerViewChild) {
+                        this.layoutContainer.replaceChildren(childEl)
+                    // } else {
+                    //     this.layoutContainer.appendChild(childEl);
+                    // }
+                    this.currentChildLayoutPath = childLayoutPath
+                    
+                }
+            } else {
+                // not found
+            }
+
             // re-use layout, just swap child content
             //const parentRouterView = this.rootElem.querySelector('router-view');
-            if (!this.routerViewParent) {
+            /*
+            if (!this.layoutContainer) {
                 console.warn('<router-view> not found in existing layout');
                 return;
             }
@@ -125,11 +170,11 @@ export default class Router {
                 const Child = match.matchedChildRoute.component;
                 const childEl = new Child().getElement();
                 //parentRouterView.replaceWith(childEl);
-                this.routerViewParent.innerHTML = ''
-                this.routerViewParent.append(childEl)
+                this.layoutContainer.innerHTML = ''
+                this.layoutContainer.append(childEl)
             } else {
                 parentRouterView.replaceWith(document.createTextNode(''));
-            }
+            }*/
         }
     }
 

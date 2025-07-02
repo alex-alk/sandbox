@@ -23,12 +23,12 @@ const routes = [
             {
                 path: '/users',
                 component : Users
-            },
-            {
-                path: '/userss',
-                component : AboutPagee
             }
         ]
+    },
+    {
+        path: '/about',
+        component : AboutPagee
     },
     {
         path: '/404',

@@ -28,9 +28,9 @@ export class Sidebar {
                     </a>
                 </li>
                 <li>
-                    <a href="/userss" class="router-link-active router-link-exact-active active-route">
+                    <a href="/about" class="router-link-active router-link-exact-active active-route">
                         <i class="pi pi-fw pi-id-card layout-menuitem-icon"></i>
-                        <span class="layout-menuitem-text">Utilizatoriiii</span>
+                        <span class="layout-menuitem-text">About</span>
                     </a>
                 </li>
             </ul>
