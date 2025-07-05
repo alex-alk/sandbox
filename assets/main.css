@@ -1,3 +1,5 @@
+
+
 .layout-wrapper {
     min-height: 100vh;
 }
@@ -42,19 +44,11 @@ img {
     text-decoration: none;
 }
 
-html {
-    height: 100%;
-    font-size: 14px;
-    line-height: 1.5;
-    --surface-overlay: white;
-    --primary-color: #10b981;
-    --surface-hover: #f1f5f9;
-    --text-color: #334155;
-    --surface-card: white;
-}
-
 *, ::before, ::after {
     box-sizing: border-box;
+    border-width: 0;
+    border-style: solid;
+    border-color: #e5e7eb;
 }
 
 .layout-sidebar {
@@ -70,7 +64,7 @@ html {
     left: 2rem;
     transition: transform var(--layout-section-transition-duration), left var(--layout-section-transition-duration);
     background-color: var(--surface-overlay);
-    border-radius: var(--content-border-radius);
+    border-radius: 6px;
     padding: 0.5rem 1.5rem;
 }
 
@@ -158,7 +152,7 @@ a {
     background: var(--surface-card);
     padding: 2rem;
     margin-bottom: 2rem;
-    border-radius: var(--content-border-radius);
+    border-radius: 6px;
 }
 
 .font-semibold {
@@ -172,4 +166,277 @@ a {
 
 .mb-4 {
     margin-bottom: 1rem;
+}
+.p-datatable-header {
+    background: var(--p-datatable-header-background);
+    color: var(--p-datatable-header-color);
+    border-color: var(--p-datatable-header-border-color);
+    border-style: solid;
+    padding: var(--p-datatable-header-padding);
+}
+.p-datatable-gridlines .p-datatable-header
+ {
+    border-width: 1px 1px 0 1px;
+}
+
+.justify-between {
+    justify-content: space-between;
+}
+
+.flex {
+    display: flex;
+}
+
+.btn-primary {
+    display: inline-flex;
+    background: transparent;
+    color: #10b981;
+    font-weight: 500;
+    border: 1px solid #a7f3d0;
+    gap: 0.5rem;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: inherit;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.btn-primary:hover {
+    background-color: #ecfdf5;
+    border-color: #a7f3d0;
+}
+
+.p-iconfield {
+    position: relative;
+}
+
+.p-iconfield .p-inputicon:first-child {
+    inset-inline-start: 0.75rem;
+}
+.p-iconfield .p-inputtext:not(:first-child) {
+    padding-inline-start: calc((0.75rem * 2) + 1rem);
+}
+.p-inputicon {
+    position: absolute;
+    top: 50%;
+    margin-top: calc(-1 * (1rem / 2));
+    color: #94a3b8;
+    line-height: 1;
+}
+
+.p-inputtext {
+    font-family: inherit;
+    font-feature-settings: inherit;
+    font-size: 1rem;
+    color: #334155;
+    background: white;
+    padding-block: 0.5rem;
+    padding-inline: 0.75rem;
+    border: 1px solid #cbd5e1;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    appearance: none;
+    border-radius: 6px;
+    outline-color: transparent;
+    min-height: 100%;;
+}
+
+.p-datatable-gridlines .p-datatable-thead > tr > th {
+    border-width: 1px 0 1px 1px;
+}
+
+.p-datatable-header-cell {
+    padding: 0.75rem 1rem;
+    border-color: #e2e8f0;
+    border-style: solid;
+    border-width: 0 0 1px 0;
+    color: #334155;
+    font-weight: normal;
+    text-align: start;
+}
+.p-datatable-table {
+    border-spacing: 0;
+    border-collapse: separate;
+    width: 100%;
+}
+
+.p-inputtext:enabled:hover {
+    border-color: #94a3b8;
+}
+
+.p-inputtext:enabled:focus {
+    border-color: #10b981;
+    outline: 0 none transparent;
+    outline-offset: 0;
+}
+
+.p-datatable-column-header-content {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.p-datatable-column-title, .p-datatable-sort-icon, .p-datatable-sort-badge {
+    vertical-align: middle;
+}
+
+.p-datatable-column-title {
+    font-weight: 600;
+}
+.p-datatable-gridlines .p-datatable-thead > tr > th {
+    border-width: 1px 0 1px 1px;
+}
+.p-datatable-gridlines .p-datatable-thead > tr > th {
+    border-width: 1px 0 1px 1px;
+}
+
+html {
+    height: 100%;
+    font-size: 14px;
+    line-height: 1.5;
+    --p-primary-color: #10b981;
+    --surface-overlay: white;
+    --primary-color: #10b981;
+    --surface-hover: #f1f5f9;
+    --text-color: #334155;
+    --surface-card: white;
+    --p-datatable-header-background: white;
+    --p-datatable-header-color: #334155;
+    --p-datatable-header-border-color: #e2e8f0;
+    --p-datatable-header-padding: 0.75rem 1rem;
+    --p-button-outlined-primary-border-color: #a7f3d0;
+    --p-button-outlined-primary-color: #10b981;
+    --p-button-primary-border-color: var(--p-primary-color);
+    --p-button-padding-y: 0.5rem;
+    --p-button-padding-x: 0.75rem;
+    --p-button-border-radius: 6px;
+    --p-button-label-font-weight: 500;
+    --p-button-gap: 0.5rem;
+    --t-02: 0.2s 
+}
+.p-datatable-popover-filter {
+    display: inline-flex
+;
+    margin-inline-start: auto;
+}
+.p-button-text.p-button-secondary {
+    background: transparent;
+    border-color: transparent;
+    color: #64748b;
+}
+.p-button-icon-only.p-button-rounded {
+    border-radius: 50%;
+    height: 2.5rem;
+}
+.p-button-icon-only {
+    padding-inline-start: 0;
+    padding-inline-end: 0;
+    gap: 0;
+}
+
+.p-button {
+    display: inline-flex;
+    cursor: pointer;
+    user-select: none;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+    font-family: inherit;
+    font-feature-settings: inherit;
+    transition: background 0.2s, color 0.2s, border-color 0.2s, outline-color 0.2s, box-shadow 0.2s;
+    outline-color: transparent;
+}
+
+.p-datatable.p-datatable-gridlines:has(.p-datatable-thead):has(.p-datatable-tbody) .p-datatable-tbody > tr > td {
+    border-width: 0 0 1px 1px;
+}
+.p-datatable-tbody > tr > td {
+    text-align: start;
+    border-color: #e2e8f0;
+    border-style: solid;
+    padding: 0.75rem 1rem;
+}
+table {
+    line-height: normal;
+}
+
+.p-button-text.p-button-secondary:not(:disabled):hover {
+    background: #f8fafc;
+    border-color: transparent;
+    color: #64748b;
+}
+.p-icon {
+    display: inline-block;
+    vertical-align: baseline;
+}
+
+.p-icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+.p-button-icon-only .p-button-label {
+    visibility: hidden;
+    width: 0;
+}
+.p-datatable-gridlines .p-datatable-paginator-bottom {
+    border-width: 0 1px 1px 1px;
+}
+
+
+.p-datatable-paginator-bottom {
+    border-color: #e2e8f0;
+    border-style: solid;
+}
+.p-paginator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    color: #334155;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    gap: 0.25rem;
+}
+.p-paginator-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+.p-paginator-page, .p-paginator-next, .p-paginator-last, .p-paginator-first, .p-paginator-prev {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    user-select: none;
+    overflow: hidden;
+    position: relative;
+    border: 0 none;
+    color: #64748b;
+    min-width: 2.5rem;
+    height: 2.5rem;
+    transition: background var(--t-02), color var(--t-02), outline-color var(--t-02), box-shadow var(--t-02);
+    border-radius: 50%;
+    padding: 0;
+    margin: 0;
+}
+.p-disabled, .p-component:disabled {
+    opacity: 0.6;
+}
+.p-disabled, .p-disabled * {
+    cursor: default;
+    pointer-events: none;
+    user-select: none;
+}
+
+.p-paginator-page.p-paginator-page-selected {
+    background: #ecfdf5;
+    color: #047857;
 }
